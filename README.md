@@ -22,10 +22,10 @@ The generated executables will be moved into /usr/local/bin/ and will have the f
         └── rap_testu01
 ```
 
+## Running the tests
 Set the workspace to be the folder where you want the results to be generated.
 There must be a folder called "binaries" or "bins" containing the binaries in the workspace.
 
-## Running the tests
 To run the tests, run the following command:
 
 ```
