@@ -30,11 +30,6 @@ wrks1 = workbook.add_worksheet('NIST & Rabbit')
 nistDirs = os.listdir(nistPath)
 binsList = { x: { 'Nist': None, 'Rabbit': None } for x in nistDirs }
 
-totalGoldBoard = 0
-totalSilverBoard = 0
-totalBronzeBoard = 0
-totalDiscardedBoard = 0
-
 #=========================
 # --------- NIST ---------
 #=========================
@@ -176,25 +171,20 @@ wrks1.write(3 + 6, startCol + 7, 'Discarded:', results_format)
 wrks1.write(3 + 7, startCol + 7, 'TOTAL:', results_format)
 
 totalGold = len([j for j in binsList if not binsList[j]['Nist'][3] and not binsList[j]['Nist'][1] and not binsList[j]['Rabbit'][1]])
-wrks1.write(3 + 3, startCol + 7, totalGold)
+wrks1.write(3 + 3, startCol + 8, totalGold)
 #condition 1 silver
 totalSilver = len([j for j in binsList if not binsList[j]['Nist'][3] and binsList[j]['Nist'][1] == 1 and not binsList[j]['Rabbit'][1]])
 #condition 2 silver
 totalSilver += len([j for j in binsList if not binsList[j]['Nist'][3] and not binsList[j]['Nist'][1] and binsList[j]['Rabbit'][1] == 1])
-wrks1.write(3 + 4, startCol + 7, totalSilver)
+wrks1.write(3 + 4, startCol + 8, totalSilver)
 #condition 1 bronze
 totalBronze = len([j for j in binsList if not binsList[j]['Nist'][3] and binsList[j]['Nist'][1] == 2 and not binsList[j]['Rabbit'][1]])
 #condition 2 silver
 totalBronze += len([j for j in binsList if not binsList[j]['Nist'][3] and binsList[j]['Nist'][1] == 1 and binsList[j]['Rabbit'][1] == 1])
-wrks1.write(3 + 5, startCol + 7, totalBronze)
+wrks1.write(3 + 5, startCol + 8, totalBronze)
 totalDiscarded = len([j for j in binsList if binsList[j]['Nist'][3] > 0 or binsList[j]['Nist'][1] > 2 or binsList[j]['Rabbit'][1] > 1 or (binsList[j]['Nist'][1] == 2 and binsList[j]['Rabbit'][1] == 1)])
-wrks1.write(3 + 6, startCol + 7, totalDiscarded)
-wrks1.write(3 + 7, startCol + 7, totalGold + totalSilver + totalBronze + totalDiscarded)
-
-totalGoldBoard += totalGold
-totalSilverBoard += totalSilver
-totalBronzeBoard += totalBronze
-totalDiscardedBoard += totalDiscarded
+wrks1.write(3 + 6, startCol + 8, totalDiscarded)
+wrks1.write(3 + 7, startCol + 8, totalGold + totalSilver + totalBronze + totalDiscarded)
 
 dirs = os.listdir('.')
 set_dirs = [d for d in dirs if d.startswith("set")]
