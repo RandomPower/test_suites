@@ -10,10 +10,10 @@ chmod +x runMe.sh
 ./runMe.sh
 ```
 
-The generated executables will be moved into /usr/local/bin/ and will have the following structure:
+The generated executables will be moved into /usr/local/bin/test_lib/ and will have the following structure:
 
 ```
-/usr/local/bin/
+/usr/local/bin/test_lib
     ├── nist/
     │   ├── assess
     │   ├── run_nist_tests.sh/
@@ -29,7 +29,7 @@ There must be a folder called "binaries" or "bins" containing the binaries in th
 To run the tests, run the following command:
 
 ```
-nohup /usr/local/bin/runtests.sh &
+nohup /usr/local/bin/test_lib/runtests.sh &
 ```
 As the tests will take a lot of time, this will ensure that they are ran in background.
 
