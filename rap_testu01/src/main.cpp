@@ -2,12 +2,31 @@
 #include <filesystem>
 #include <vector>
 #include <algorithm>
+#include <regex>
 
 #include "filestruct/filestruct.hpp"
 #include "test_wrapper/run_testu01.hpp"
 
 using namespace std;
 namespace fs = filesystem;
+
+bool naturalCompare(const std::string& a, const std::string& b) {
+    std::regex re("(\\d+)");
+    std::sregex_token_iterator it_a(a.begin(), a.end(), re, 1);
+    std::sregex_token_iterator it_b(b.begin(), b.end(), re, 1);
+    std::sregex_token_iterator end;
+
+    while (it_a != end && it_b != end) {
+        int num_a = std::stoi(*it_a);
+        int num_b = std::stoi(*it_b);
+        if (num_a != num_b)
+            return num_a < num_b;
+        ++it_a;
+        ++it_b;
+    }
+    // If numbers are equal or missing, fallback to string comparison
+    return a < b;
+}
 
 void createFileStructsFromBins(vector<string> &bin_files, vector<FileStruct> &sets)
 {
@@ -34,7 +53,7 @@ void createFileStructsFromBins(vector<string> &bin_files, vector<FileStruct> &se
         }
     }
 
-    std::sort(bin_files.begin(), bin_files.end());
+    std::sort(bin_files.begin(), bin_files.end(), naturalCompare);
 
     for (size_t i = 0; i < bin_files.size(); i += 20)
     {
