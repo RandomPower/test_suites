@@ -28,4 +28,7 @@ cp ./report_generator/dist/report_generator ./test_lib
 # Copy the TestU01 runner in the new folder
 cp ./rap_testu01/build/src/rap_testu01 ./test_lib/testu01
 
-sudo mv ./test_lib /usr/local/bin/test_lib
+# Give run permissions to the scripts
+chmod +x ./test_lib/runtests.sh
+
+sudo rsync -avz test_lib /usr/local/bin/.

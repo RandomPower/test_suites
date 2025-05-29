@@ -1,6 +1,7 @@
 #include <iostream>
 #include <filesystem>
 #include <vector>
+#include <algorithm>
 
 #include "filestruct/filestruct.hpp"
 #include "test_wrapper/run_testu01.hpp"
@@ -33,6 +34,8 @@ void createFileStructsFromBins(vector<string> &bin_files, vector<FileStruct> &se
         }
     }
 
+    std::sort(bin_files.begin(), bin_files.end());
+
     for (size_t i = 0; i < bin_files.size(); i += 20)
     {
         FileStruct fs;
@@ -41,6 +44,13 @@ void createFileStructsFromBins(vector<string> &bin_files, vector<FileStruct> &se
             fs.addFile(bin_files[j]);
         }
         sets.push_back(fs);
+        
+        cout << "Created FileStruct for files: ";
+        for (const auto &file_name : fs.getFileNames())
+        {
+            cout << file_name << " ";
+        }
+        cout << endl;
     }
 }
 

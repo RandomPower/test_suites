@@ -18,8 +18,8 @@ The generated executables will be moved into /usr/local/bin/test_lib/ and will h
     │   ├── assess
     │   ├── run_nist_tests.sh/
     │   └── templates/
-    └── testu01/
-        └── rap_testu01
+    ├── testu01
+    └── report_generator
 ```
 
 ## Running the tests
