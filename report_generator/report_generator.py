@@ -21,7 +21,11 @@ endFailedTests = ' ----------------------------------------------\n'
 passedTests = ' All tests were passed\n'
 failedTests = ' All other tests were passed\n'
 
-report_name = datetime.now().strftime("%Y%m%d_%H%M%S") + "_report"
+try:
+    cur_dir = os.getcwd().replace('\\', '/').split('/')[-1] + "_"
+except:
+    cur_dir = ""
+report_name = cur_dir + datetime.now().strftime("%Y%m%d_%H%M%S") + "_report"
 workbook = xlsxwriter.Workbook(f'{report_name}.xlsx')
 
 
