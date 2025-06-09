@@ -59,6 +59,8 @@ if os.path.isdir(nistPath):
                     tmpNum1 = int(line.split('   ')[1].split('/')[0])
                 except ValueError:
                     tmpNum1 = int(line.split(' * ')[1].split('/')[0])
+                except IndexError:
+                    tmpNum1 = int(line.split(' * ')[1].split('/')[0])
                 tmpNum2 = int(line.split('/')[1].split(' ')[0])
 
                 const = 3.18
