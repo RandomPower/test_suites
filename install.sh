@@ -32,3 +32,16 @@ cp ./rap_testu01/build/src/rap_testu01 ./test_lib/testu01
 chmod +x ./test_lib/runtests.sh
 
 sudo rsync -avz test_lib /usr/local/bin/.
+
+# Install the IID procedure
+cd /usr/local/bin/test_lib
+
+chmod +x run_iid.sh
+git clone https://github.com/RandomPower/IID_validation.git
+
+cd IID_validation
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+pip install .
+deactivate

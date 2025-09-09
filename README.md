@@ -6,8 +6,8 @@ Navigate with the terminal into the test_suites directory and run the following 
 Admin powers will be required for this last operation.
 
 ```
-chmod +x runMe.sh
-./runMe.sh
+chmod +x install.sh
+./install.sh
 ```
 
 The generated executables will be moved into /usr/local/bin/test_lib/ and will have the following structure:
