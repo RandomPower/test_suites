@@ -1,5 +1,6 @@
 #!/bin/bash
 
+nohup /usr/local/bin/test_lib/run_iid.sh &
 nohup /usr/local/bin/test_lib/nist/run_nist_tests.sh &
 nohup /usr/local/bin/test_lib/testu01 &
 
