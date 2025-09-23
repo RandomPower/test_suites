@@ -16,6 +16,7 @@ nistPath = 'nist_results/'
 nistSubDir = '/AlgorithmTesting/finalAnalysisReport.txt'
 failedNist = '*'
 rabbitPath = 'rabbit_results/'
+iid_path = 'iid_results/'
 introFailedTests = '       Test                          p-value\n'
 endFailedTests = ' ----------------------------------------------\n'
 passedTests = ' All tests were passed\n'
@@ -32,7 +33,7 @@ workbook = xlsxwriter.Workbook(f'{report_name}.xlsx')
 wrks1 = workbook.add_worksheet('NIST & Rabbit')
 
 nistDirs = os.listdir(nistPath)
-binsList = { x: { 'Nist': None, 'Rabbit': None } for x in nistDirs }
+binsList = { x: { 'Nist': None, 'Rabbit': None, 'IID': None } for x in nistDirs }
 
 #=========================
 # --------- NIST ---------
@@ -123,6 +124,26 @@ if os.path.isdir(rabbitPath):
 
         f.close()
 
+if os.path.isdir(iid_path):
+    iidDirs = os.listdir(iid_path)
+    for d in iidDirs:
+        key = d.split('@')[0]
+        log_path = os.path.join(iid_path, d) + '/' + d + '.log'
+        if os.path.isfile(log_path):
+            with open(log_path, 'r') as f:
+                lines = f.readlines()
+                iid_result = ""
+                min_entropy = ""
+                for line in lines:
+                    if "IID assumption validated" in line:
+                        iid_result = "IID assumption validated"
+                    elif "IID assumption rejected" in line:
+                        iid_result = "IID assumption rejected"
+                    elif "RaP min-entropy" in line:
+                        min_entropy = line.split("INFO     ")[-1]
+                binsList[key]['IID'] = f"{iid_result}; {min_entropy}"
+
+
 # ====================================
 # ----------- Excel Report -----------
 # ====================================
@@ -150,8 +171,8 @@ results_format = workbook.add_format({
 
 # Merge cells
 startCol = 0
-endCol = 5
-wrks1.merge_range(0, startCol, 0, endCol, 'NIST & RABBIT', merge_format)
+endCol = 6
+wrks1.merge_range(0, startCol, 0, endCol, 'NIST & RABBIT & IID', merge_format)
 
 wrks1.set_column(startCol, endCol, 15)
 wrks1.write(1, startCol, 'File', title_format)
@@ -160,6 +181,7 @@ wrks1.write(1, startCol + 2, 'NIST Bad Fails', title_format)
 wrks1.write(1, startCol + 3, 'NIST Stat. Fails', title_format)
 wrks1.write(1, startCol + 4, 'Rabbit Failed Tests', title_format)
 wrks1.write(1, startCol + 5, 'Rabbit', title_format)
+wrks1.write(1, startCol + 6, 'IID', title_format)
 
 for j, x in enumerate(binsList):
     wrks1.write(2 + j, startCol, x)
@@ -168,29 +190,33 @@ for j, x in enumerate(binsList):
     wrks1.write(2 + j, startCol + 3, binsList[x]['Nist'][1])  #Counter
     wrks1.write(2 + j, startCol + 4, binsList[x]['Rabbit'][2])#Name
     wrks1.write(2 + j, startCol + 5, binsList[x]['Rabbit'][1])#Counter
+    try:
+        wrks1.write(2 + j, startCol + 6, binsList[x]['IID'])       #IID result
+    except:
+        wrks1.write(2 + j, startCol + 6, "No IID test performed")  #IID result
 
-wrks1.write(3 + 2, startCol + 7, 'BIN RESULTS:', results_format)
-wrks1.write(3 + 3, startCol + 7, 'Golden:', results_format)
-wrks1.write(3 + 4, startCol + 7, 'Silver:', results_format)
-wrks1.write(3 + 5, startCol + 7, 'Bronze:', results_format)
-wrks1.write(3 + 6, startCol + 7, 'Discarded:', results_format)
-wrks1.write(3 + 7, startCol + 7, 'TOTAL:', results_format)
+wrks1.write(3 + 2, startCol + 8, 'BIN RESULTS:', results_format)
+wrks1.write(3 + 3, startCol + 8, 'Golden:', results_format)
+wrks1.write(3 + 4, startCol + 8, 'Silver:', results_format)
+wrks1.write(3 + 5, startCol + 8, 'Bronze:', results_format)
+wrks1.write(3 + 6, startCol + 8, 'Discarded:', results_format)
+wrks1.write(3 + 7, startCol + 8, 'TOTAL:', results_format)
 
 totalGold = len([j for j in binsList if not binsList[j]['Nist'][3] and not binsList[j]['Nist'][1] and not binsList[j]['Rabbit'][1]])
-wrks1.write(3 + 3, startCol + 8, totalGold)
+wrks1.write(3 + 3, startCol + 9, totalGold)
 #condition 1 silver
 totalSilver = len([j for j in binsList if not binsList[j]['Nist'][3] and binsList[j]['Nist'][1] == 1 and not binsList[j]['Rabbit'][1]])
 #condition 2 silver
 totalSilver += len([j for j in binsList if not binsList[j]['Nist'][3] and not binsList[j]['Nist'][1] and binsList[j]['Rabbit'][1] == 1])
-wrks1.write(3 + 4, startCol + 8, totalSilver)
+wrks1.write(3 + 4, startCol + 9, totalSilver)
 #condition 1 bronze
 totalBronze = len([j for j in binsList if not binsList[j]['Nist'][3] and binsList[j]['Nist'][1] == 2 and not binsList[j]['Rabbit'][1]])
 #condition 2 silver
 totalBronze += len([j for j in binsList if not binsList[j]['Nist'][3] and binsList[j]['Nist'][1] == 1 and binsList[j]['Rabbit'][1] == 1])
-wrks1.write(3 + 5, startCol + 8, totalBronze)
+wrks1.write(3 + 5, startCol + 9, totalBronze)
 totalDiscarded = len([j for j in binsList if binsList[j]['Nist'][3] > 0 or binsList[j]['Nist'][1] > 2 or binsList[j]['Rabbit'][1] > 1 or (binsList[j]['Nist'][1] == 2 and binsList[j]['Rabbit'][1] == 1)])
-wrks1.write(3 + 6, startCol + 8, totalDiscarded)
-wrks1.write(3 + 7, startCol + 8, totalGold + totalSilver + totalBronze + totalDiscarded)
+wrks1.write(3 + 6, startCol + 9, totalDiscarded)
+wrks1.write(3 + 7, startCol + 9, totalGold + totalSilver + totalBronze + totalDiscarded)
 
 dirs = os.listdir('.')
 set_dirs = [d for d in dirs if d.startswith("set")]
