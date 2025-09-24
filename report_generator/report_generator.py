@@ -172,7 +172,7 @@ results_format = workbook.add_format({
 
 # Merge cells
 startCol = 0
-endCol = 6
+endCol = 5
 wrks1.merge_range(0, startCol, 0, endCol, 'NIST & RABBIT', merge_format)
 
 wrks1.set_column(startCol, endCol, 15)
@@ -331,7 +331,6 @@ for i, set in enumerate(set_dirs):
         wrks2.write(endRow + 5, startCol + 1, 'Discarded', results_format)
 
 
-
 wrks3 = workbook.add_worksheet('IID Details')
 
 startCol = 0
@@ -344,10 +343,10 @@ wrks3.write(0, startCol + 2, 'Min Entropy', title_format)
 
 for j, x in enumerate(binsList):
     wrks3.write(1 + j, startCol, x)
-    try:
+    if binsList[x]['IID'][0] is not None:
         wrks3.write(1 + j, startCol + 1, binsList[x]['IID'][0])       #IID result
         wrks3.write(1 + j, startCol + 2, binsList[x]['IID'][1])       #MIN ENTROPY
-    except:
+    else:
         wrks3.write(1 + j, startCol + 1, "No IID test performed")  #IID result
 
 workbook.close()
