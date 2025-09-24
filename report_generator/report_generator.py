@@ -33,7 +33,7 @@ workbook = xlsxwriter.Workbook(f'{report_name}.xlsx')
 wrks1 = workbook.add_worksheet('NIST & Rabbit')
 
 nistDirs = os.listdir(nistPath)
-binsList = { x: { 'Nist': None, 'Rabbit': None, 'IID': None } for x in nistDirs }
+binsList = { x: { 'Nist': None, 'Rabbit': None, 'IID': [None, None] } for x in nistDirs }
 
 #=========================
 # --------- NIST ---------
@@ -136,12 +136,13 @@ if os.path.isdir(iid_path):
                 min_entropy = ""
                 for line in lines:
                     if "IID assumption validated" in line:
-                        iid_result = "IID assumption validated"
+                        iid_result = "VALIDATED"
                     elif "IID assumption rejected" in line:
-                        iid_result = "IID assumption rejected"
+                        iid_result = "REJECTED"
                     elif "RaP min-entropy" in line:
                         min_entropy = line.split("INFO     ")[-1]
-                binsList[key]['IID'] = f"{iid_result}; {min_entropy}"
+                binsList[key]['IID'][0] = f"{iid_result}"
+                binsList[key]['IID'][1] = f"{min_entropy}"
 
 
 # ====================================
@@ -172,7 +173,7 @@ results_format = workbook.add_format({
 # Merge cells
 startCol = 0
 endCol = 6
-wrks1.merge_range(0, startCol, 0, endCol, 'NIST & RABBIT & IID', merge_format)
+wrks1.merge_range(0, startCol, 0, endCol, 'NIST & RABBIT', merge_format)
 
 wrks1.set_column(startCol, endCol, 15)
 wrks1.write(1, startCol, 'File', title_format)
@@ -181,7 +182,6 @@ wrks1.write(1, startCol + 2, 'NIST Bad Fails', title_format)
 wrks1.write(1, startCol + 3, 'NIST Stat. Fails', title_format)
 wrks1.write(1, startCol + 4, 'Rabbit Failed Tests', title_format)
 wrks1.write(1, startCol + 5, 'Rabbit', title_format)
-wrks1.write(1, startCol + 6, 'IID', title_format)
 
 for j, x in enumerate(binsList):
     wrks1.write(2 + j, startCol, x)
@@ -190,10 +190,6 @@ for j, x in enumerate(binsList):
     wrks1.write(2 + j, startCol + 3, binsList[x]['Nist'][1])  #Counter
     wrks1.write(2 + j, startCol + 4, binsList[x]['Rabbit'][2])#Name
     wrks1.write(2 + j, startCol + 5, binsList[x]['Rabbit'][1])#Counter
-    try:
-        wrks1.write(2 + j, startCol + 6, binsList[x]['IID'])       #IID result
-    except:
-        wrks1.write(2 + j, startCol + 6, "No IID test performed")  #IID result
 
 wrks1.write(3 + 2, startCol + 8, 'BIN RESULTS:', results_format)
 wrks1.write(3 + 3, startCol + 8, 'Golden:', results_format)
@@ -333,5 +329,25 @@ for i, set in enumerate(set_dirs):
         wrks2.write(endRow + 5, startCol + 1, 'Bronze', results_format)
     else:
         wrks2.write(endRow + 5, startCol + 1, 'Discarded', results_format)
+
+
+
+wrks3 = workbook.add_worksheet('IID Details')
+
+startCol = 0
+endCol = 1
+
+wrks3.set_column(startCol, endCol, 15)
+wrks3.write(0, startCol, 'File', title_format)
+wrks3.write(0, startCol + 1, 'IID', title_format)
+wrks3.write(0, startCol + 2, 'Min Entropy', title_format)
+
+for j, x in enumerate(binsList):
+    wrks3.write(1 + j, startCol, x)
+    try:
+        wrks3.write(1 + j, startCol + 1, binsList[x]['IID'][0])       #IID result
+        wrks3.write(1 + j, startCol + 2, binsList[x]['IID'][1])       #MIN ENTROPY
+    except:
+        wrks3.write(1 + j, startCol + 1, "No IID test performed")  #IID result
 
 workbook.close()
