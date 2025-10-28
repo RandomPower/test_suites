@@ -13,15 +13,15 @@ else
     exit 1
 fi
 
+count=0
+MAX_JOBS=5
 
-count = 0
-for i in $FILES 
-do
-    nohup $PY_VENV_DIR $MAIN_DIR -i "$i" --no-stat_analysis &
+for i in $FILES; do
+    $PY_VENV_DIR $MAIN_DIR -i "$i" --no-stat_analysis &
+    ((count++))
 
-    # Launch up to 5 processes at the time, then wait for their completion
-    count=$((count + 1))
-    if (( count % 5 == 0 )); then
+    # Launch up to 5 processes at a time
+    if (( count % MAX_JOBS == 0 )); then
         wait
     fi
 done

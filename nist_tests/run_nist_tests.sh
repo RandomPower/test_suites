@@ -6,47 +6,13 @@ CUR_DIR=$(pwd)
 export OMP_NUM_THREADS=32
 
 create_dir_script() {
-# Create Directory Structure
-
     if [ -z "${NISTFOLDER+x}" ]; then
         echo "NISTFOLDER is unset"
-        exit 0
-    else
-        echo "NISTFOLDER is set to '$NISTFOLDER'"
-
-        if [ ! -d nist_results ]; then
-            echo "Directory 'nist_results' does not exist. Creating it."
-            mkdir nist_results
-        fi
-        cd nist_results
-
-        mkdir "$NISTFOLDER"
-        cd "$NISTFOLDER"
-
-        for diiname in AlgorithmTesting; do # BBS CCG G-SHA1 LCG MODEXP MS QCG1 QCG2 XOR
-            mkdir "$diiname"
-        done
-
-        for dname in AlgorithmTesting; do # BBS CCG G-SHA1 LCG MODEXP MS QCG1 QCG2 XOR
-            mkdir "$dname/Frequency"
-            mkdir "$dname/BlockFrequency"
-            mkdir "$dname/Runs"
-            mkdir "$dname/LongestRun"
-            mkdir "$dname/Rank"
-            mkdir "$dname/FFT"
-            mkdir "$dname/NonOverlappingTemplate"
-            mkdir "$dname/OverlappingTemplate"
-            mkdir "$dname/Universal"
-            mkdir "$dname/LinearComplexity"
-            mkdir "$dname/Serial"
-            mkdir "$dname/ApproximateEntropy"
-            mkdir "$dname/CumulativeSums"
-            mkdir "$dname/RandomExcursions"
-            mkdir "$dname/RandomExcursionsVariant"
-        done
-        cd ..
-        cd ..
+        return 0
     fi
+
+    echo "Preparing NIST folder: $NISTFOLDER"
+    mkdir -p "nist_results/$NISTFOLDER/AlgorithmTesting"/{Frequency,BlockFrequency,Runs,LongestRun,Rank,FFT,NonOverlappingTemplate,OverlappingTemplate,Universal,LinearComplexity,Serial,ApproximateEntropy,CumulativeSums,RandomExcursions,RandomExcursionsVariant}
 }
 
 if [ -d binaries ]; then
@@ -59,19 +25,21 @@ else
 fi
 
 if [ ! -d ./templates ]; then
-    rsync -avz $NIST_ASSESS_DIR/templates .
+    rsync -avz "$NIST_ASSESS_DIR/templates" .
 fi
 
-count = 0
+count=0
+MAX_JOBS=20
+
 for i in $FILES 
 do
     export NISTFOLDER="$(basename "${i%.bin}")"
     create_dir_script
-    nohup $NIST_ASSESS_DIR/assess 1000000 -i "$i" -f 1 -n 2000 &
+    "$NIST_ASSESS_DIR/assess" 1000000 -i "$i" -f 1 -n 2000 &
 
     # Launch up to 20 processes at the time, then wait for their completion
-    count=$((count + 1))
-    if (( count % 20 == 0 )); then
+    ((count++))
+    if (( count % MAX_JOBS == 0 )); then
         wait
     fi
 done

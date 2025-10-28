@@ -1,12 +1,14 @@
 #!/bin/bash
 
-nohup /usr/local/bin/test_lib/run_iid.sh &
-nohup /usr/local/bin/test_lib/nist/run_nist_tests.sh &
-nohup /usr/local/bin/test_lib/testu01 &
+pids=()
+/usr/local/bin/test_lib/run_iid.sh & pids+=($!)
+/usr/local/bin/test_lib/nist/run_nist_tests.sh & pids+=($!)
+/usr/local/bin/test_lib/testu01 & pids+=($!)
 
-wait
+for pid in "${pids[@]}"; do
+    wait "$pid"
+done
 
 /usr/local/bin/test_lib/report_generator
 
-# Remove the automatically generated junk bin files
-rm ._*.bin
+rm -f ._*.bin
