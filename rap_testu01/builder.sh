@@ -3,6 +3,7 @@ CUR_DIR=$(pwd)
 
 cd TestU01-2009
 
+chmod +x ./configure
 ./configure --prefix="$CUR_DIR"/testu01lib
 make clean
 make

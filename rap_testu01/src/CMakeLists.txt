@@ -3,7 +3,8 @@ set(SOURCES main.cpp)
 
 find_package(OpenMP REQUIRED)
 
-set(TESTU01_ROOT ../testu01lib)
+# Set paths for TestU01
+set(TESTU01_ROOT ${CMAKE_CURRENT_LIST_DIR}/../testu01lib)
 include_directories(${TESTU01_ROOT}/include)
 link_directories(${TESTU01_ROOT}/lib)
 
@@ -17,8 +18,7 @@ target_link_libraries(rap_testu01
     PRIVATE
         run_testu01
         filestruct
-        
         testu01
         probdist
         mylib
-    )
+)
