@@ -56,19 +56,17 @@ if os.path.isdir(nistPath):
             if failedNist in line:
                 name = line.split(' ')[-1].split('\n')[0] + '; '
                 fails[4] += name
-                try:
-                    tmpNum1 = int(line.split('   ')[1].split('/')[0])
-                except ValueError:
-                    tmpNum1 = int(line.split(' * ')[1].split('/')[0])
-                except IndexError:
-                    tmpNum1 = int(line.split(' * ')[1].split('/')[0])
-                tmpNum2 = int(line.split('/')[1].split(' ')[0])
+                matches = re.findall(r'(\d+)\s*/\s*(\d+)', line)
+                if matches:
+                    num_str, den_str = matches[-1]
+                    num = int(num_str)
+                    den = int(den_str)
 
                 const = 3.18
-                expectation = tmpNum2 * 0.99
-                sigma = math.sqrt(tmpNum2*0.99*0.01)
+                expectation = den * 0.99
+                sigma = math.sqrt(den*0.99*0.01)
 
-                if tmpNum1 < expectation - sigma * const - 2 or tmpNum1 > expectation + sigma * const + 2:
+                if num < expectation - sigma * const - 2 or num > expectation + sigma * const + 2:
                     # throw away
                     fails[2] += '\t ' + line
                     fails[3] += 1
