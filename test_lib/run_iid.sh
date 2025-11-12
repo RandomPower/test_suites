@@ -19,8 +19,10 @@ fi
 MAX_JOBS=5
 for i in "${FILES[@]}"; do
     filename=$(basename "$i")
+    sleep 1 
+
     "$PY_VENV_DIR" "$MAIN_DIR" -i "$i" --no-stat_analysis > "$OUTPUT_DIR/${filename%.bin}.log" 2>&1 &
-    while (( $(jobs -r | wc -l) >= MAX_JOBS )); do
+    while (( $(jobs -r | wc -l) >= $MAX_JOBS )); do
         wait -n
     done
 done
