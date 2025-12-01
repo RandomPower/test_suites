@@ -1,5 +1,5 @@
 CC = /usr/bin/gcc
-GCCFLAGS = -c --std=c11 -g -fno-strict-aliasing  -Wall -O2
+GCCFLAGS = -c --std=c11 -g -fno-strict-aliasing  -Wall -O2 -fopenmp
 LDFLAGS = -fopenmp
 ROOTDIR = .
 SRCDIR = $(ROOTDIR)/src

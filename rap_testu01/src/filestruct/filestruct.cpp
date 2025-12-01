@@ -151,8 +151,16 @@ void FileStruct::SetTestRequiredCount()
 
     cout << "Required numbers for test: " << test.test_number << " is " << a << endl;
     cout << "Total bytes available: " << total_bytes << endl;
-    cout << "Repeat test: " << test.test_number << " for " << repetitions << " times " << endl;
-
+    
+    if (test.test_number != 71 && test.test_number != 72 && test.test_number != 73)
+    {
+        cout << "Repeat test: " << test.test_number << " for " << repetitions << " times " << endl;
+    } 
+    else
+    {
+        cout << "Test: " << test.test_number << " will be performed only once." << endl;
+    }
+    
     for (int i = 0; i < CRUSH_NUM + 1; i++)
     {
         if (i == test.test_number)
