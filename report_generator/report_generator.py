@@ -1,350 +1,517 @@
-# Parser function that reads the outputs of the TESTU01 and NIST Tests and
-# checks if they were all passed: if the random bit stream is compliant
+"""
+Parser for TESTU01 and NIST test outputs.
+Checks if random bit streams are compliant by analyzing test results.
+Generates an Excel report with categorized results.
+"""
 
-#pythons
 import os
 import re
 import math
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Tuple, Optional
+
 import natsort
 import xlsxwriter
-from datetime import datetime
 
-from os import listdir
-from os.path import isfile, join
-
-nistPath = 'nist_results/'
-nistSubDir = '/AlgorithmTesting/finalAnalysisReport.txt'
-failedNist = '*'
-rabbitPath = 'rabbit_results/'
-iid_path = 'iid_results/'
-introFailedTests = '       Test                          p-value\n'
-endFailedTests = ' ----------------------------------------------\n'
-passedTests = ' All tests were passed\n'
-failedTests = ' All other tests were passed\n'
-
-try:
-    cur_dir = os.getcwd().replace('\\', '/').split('/')[-1] + "_"
-except:
-    cur_dir = ""
-report_name = cur_dir + datetime.now().strftime("%Y%m%d_%H%M%S") + "_report"
-workbook = xlsxwriter.Workbook(f'{report_name}.xlsx')
+from crush_lut import crush_test_iterations
 
 
-wrks1 = workbook.add_worksheet('NIST & Rabbit')
+# ============================================================================
+# CONSTANTS
+# ============================================================================
 
-nistDirs = os.listdir(nistPath)
-binsList = { x: { 'Nist': None, 'Rabbit': None, 'IID': [None, None] } for x in nistDirs }
+# Paths
+NIST_PATH = 'nist_results/'
+NIST_SUBDIR = '/AlgorithmTesting/finalAnalysisReport.txt'
+RABBIT_PATH = 'rabbit_results/'
+IID_PATH = 'iid_results/'
 
-#=========================
-# --------- NIST ---------
-#=========================
-if os.path.isdir(nistPath):
-    filenames = list(map(lambda x: nistPath + x + nistSubDir, nistDirs))
-    filedata = {f: open(f, 'r') for f in filenames}
+# Test result markers
+FAILED_NIST_MARKER = '*'
+INTRO_FAILED_TESTS = '       Test                          p-value\n'
+END_FAILED_TESTS = ' ----------------------------------------------\n'
+PASSED_TESTS = ' All tests were passed\n'
 
-    for f in filedata.values():
-        lines = f.readlines()
-        # fails struct per index:
-        # 0: whole failed test string (within stats fluctuations)
-        # 1: counter for 0
-        # 2: whole failed test string (throw away all file)
-        # 3: counter for 2
-        # 4: only the failed test names in list
-        fails = ['', 0, '', 0, '']
-        key = lines[3].split('/')[-1].split('.')[0]
-        for line in lines:
-            if failedNist in line:
-                name = line.split(' ')[-1].split('\n')[0] + '; '
-                fails[4] += name
-                matches = re.findall(r'(\d+)\s*/\s*(\d+)', line)
-                if matches:
-                    num_str, den_str = matches[-1]
-                    num = int(num_str)
-                    den = int(den_str)
+# Statistical constants
+NIST_SIGMA_THRESHOLD = 3.18
+NIST_EXPECTATION_RATE = 0.99
+NIST_FAILURE_RATE = 0.01
 
-                const = 3.18
-                expectation = den * 0.99
-                sigma = math.sqrt(den*0.99*0.01)
-
-                if num < expectation - sigma * const - 2 or num > expectation + sigma * const + 2:
-                    # throw away
-                    fails[2] += '\t ' + line
-                    fails[3] += 1
-                else:
-                    # failed within statistical fluctuations
-                    fails[0] += '\t ' + line
-                    fails[1] += 1
-        binsList[key]['Nist'] = fails
-
-        f.close()
-
-#=========================
-# -------- RABBIT --------
-#=========================
-if os.path.isdir(rabbitPath):
-    fileList = [join(rabbitPath, f) for f in listdir(rabbitPath) if isfile(join(rabbitPath, f))]
-    filedata = {f: open(f, 'r') for f in fileList}
-    for f in filedata.values():
-        lines = f.readlines()
-
-        # fails struct per index:
-        # 0: whole failed test string
-        # 1: counter
-        # 2: only failed test name
-        fails = ['', 0, '']
-        key = lines[9].split('/')[-1].split('.')[0]
-        try:
-            index = lines.index(passedTests)
-        except ValueError:
-            index = -1
-
-        if index < 0:
-            try:
-                index = lines.index(introFailedTests)
-            except ValueError:
-                index = -1
-
-            if index >= 0:
-                index += 2
-                line = lines[index]
-
-                while line != endFailedTests:
-                    name = line.split('      ')[0] + '; '
-                    fails[2] += name
-                    fails[0] += '\t ' + line
-                    fails[1] += 1
-                    index += 1
-                    line = lines[index]
-        else:
-            allTestsPassed = True
-
-        binsList[key]['Rabbit'] = fails
-
-        f.close()
-
-if os.path.isdir(iid_path):
-    iidDirs = os.listdir(iid_path)
-    for d in iidDirs:
-        key = d.split('@')[0]
-        log_path = os.path.join(iid_path, d) + '/' + d + '.log'
-        if os.path.isfile(log_path):
-            with open(log_path, 'r') as f:
-                lines = f.readlines()
-                iid_result = ""
-                min_entropy = ""
-                for line in lines:
-                    if "IID assumption validated" in line:
-                        iid_result = "VALIDATED"
-                    elif "IID assumption rejected" in line:
-                        iid_result = "REJECTED"
-                    elif "RaP min-entropy" in line:
-                        min_entropy = line.split("INFO     ")[-1]
-                binsList[key]['IID'][0] = f"{iid_result}"
-                binsList[key]['IID'][1] = f"{min_entropy}"
+# Excel formatting
+EXCEL_COL_WIDTH = 15
 
 
-# ====================================
-# ----------- Excel Report -----------
-# ====================================
+# ============================================================================
+# DATA STRUCTURES
+# ============================================================================
 
-# Create a format to use in the merged range.
-merge_format = workbook.add_format({
-'bold': 1,
-'border': 1,
-'align': 'center',
-'valign': 'vcenter',
-'font_color': 'blue',
-'font_size': 13})
+class TestResult:
+    """Container for test results"""
+    def __init__(self):
+        self.failed_details = ''
+        self.failed_count = 0
+        self.failed_names = ''
+        
+        # NIST-specific
+        self.bad_fails_details = ''
+        self.bad_fails_count = 0
+        
+        # IID-specific
+        self.iid_validation = None
+        self.min_entropy = None
 
-title_format = workbook.add_format({
-'bold': 1,
-'border': 1,
-'align': 'center',
-'valign': 'vcenter'})
 
-results_format = workbook.add_format({
-'bold': 1,
-'align': 'center',
-'valign': 'vcenter',
-'font_color': 'red'})
+# ============================================================================
+# NIST TEST PARSING
+# ============================================================================
 
-# Merge cells
-startCol = 0
-endCol = 5
-wrks1.merge_range(0, startCol, 0, endCol, 'NIST & RABBIT', merge_format)
-
-wrks1.set_column(startCol, endCol, 15)
-wrks1.write(1, startCol, 'File', title_format)
-wrks1.write(1, startCol + 1, 'NIST Failed Tests', title_format)
-wrks1.write(1, startCol + 2, 'NIST Bad Fails', title_format)
-wrks1.write(1, startCol + 3, 'NIST Stat. Fails', title_format)
-wrks1.write(1, startCol + 4, 'Rabbit Failed Tests', title_format)
-wrks1.write(1, startCol + 5, 'Rabbit', title_format)
-
-for j, x in enumerate(binsList):
-    wrks1.write(2 + j, startCol, x)
-    wrks1.write(2 + j, startCol + 1, binsList[x]['Nist'][4])  #Name
-    wrks1.write(2 + j, startCol + 2, binsList[x]['Nist'][3])  #Counter
-    wrks1.write(2 + j, startCol + 3, binsList[x]['Nist'][1])  #Counter
-    wrks1.write(2 + j, startCol + 4, binsList[x]['Rabbit'][2])#Name
-    wrks1.write(2 + j, startCol + 5, binsList[x]['Rabbit'][1])#Counter
-
-wrks1.write(3 + 2, startCol + 8, 'BIN RESULTS:', results_format)
-wrks1.write(3 + 3, startCol + 8, 'Golden:', results_format)
-wrks1.write(3 + 4, startCol + 8, 'Silver:', results_format)
-wrks1.write(3 + 5, startCol + 8, 'Bronze:', results_format)
-wrks1.write(3 + 6, startCol + 8, 'Discarded:', results_format)
-wrks1.write(3 + 7, startCol + 8, 'TOTAL:', results_format)
-
-totalGold = len([j for j in binsList if not binsList[j]['Nist'][3] and not binsList[j]['Nist'][1] and not binsList[j]['Rabbit'][1]])
-wrks1.write(3 + 3, startCol + 9, totalGold)
-#condition 1 silver
-totalSilver = len([j for j in binsList if not binsList[j]['Nist'][3] and binsList[j]['Nist'][1] == 1 and not binsList[j]['Rabbit'][1]])
-#condition 2 silver
-totalSilver += len([j for j in binsList if not binsList[j]['Nist'][3] and not binsList[j]['Nist'][1] and binsList[j]['Rabbit'][1] == 1])
-wrks1.write(3 + 4, startCol + 9, totalSilver)
-#condition 1 bronze
-totalBronze = len([j for j in binsList if not binsList[j]['Nist'][3] and binsList[j]['Nist'][1] == 2 and not binsList[j]['Rabbit'][1]])
-#condition 2 silver
-totalBronze += len([j for j in binsList if not binsList[j]['Nist'][3] and binsList[j]['Nist'][1] == 1 and binsList[j]['Rabbit'][1] == 1])
-wrks1.write(3 + 5, startCol + 9, totalBronze)
-totalDiscarded = len([j for j in binsList if binsList[j]['Nist'][3] > 0 or binsList[j]['Nist'][1] > 2 or binsList[j]['Rabbit'][1] > 1 or (binsList[j]['Nist'][1] == 2 and binsList[j]['Rabbit'][1] == 1)])
-wrks1.write(3 + 6, startCol + 9, totalDiscarded)
-wrks1.write(3 + 7, startCol + 9, totalGold + totalSilver + totalBronze + totalDiscarded)
-
-dirs = os.listdir('.')
-set_dirs = [d for d in dirs if d.startswith("set")]
-
-wrks2 = workbook.add_worksheet('Crush & Alphabit')
-
-for i, set in enumerate(set_dirs):
-    fileList = os.listdir(os.path.join('./', set))
+def parse_nist_results() -> Dict[str, TestResult]:
+    """Parse NIST test results from all directories."""
+    if not os.path.isdir(NIST_PATH):
+        return {}
     
-    startRow = 0
-    endRow = 2
-    startCol = i * 3
-    endCol = startCol + 2
-
-    wrks2.merge_range(0, startCol, 0, endCol, 'Set ' + str(i+1), merge_format)
-    wrks2.merge_range(1, startCol, 1, startCol + 1, 'Crush', title_format)
-    wrks2.write(1, startCol + 2, 'Alphabit', title_format)
-    wrks2.set_column(startCol+1, endCol, 15)
-
-    nameCrush = '([0-9]|).-output-crush-multi.txt'
-    tmp = filter(lambda x: re.match(nameCrush, x), fileList)
+    results = {}
+    nist_dirs = os.listdir(NIST_PATH)
     
-    filenames = list(map(lambda x: set + '/' + x, tmp))
-    filenames = natsort.natsorted(filenames)
-    filedata = {f: open(f, 'r') for f in filenames}
-
-    count1 = 0
-    for j, f in enumerate(filedata.values()):
-        lines = f.readlines()
-        fails = ['', 0, '']
-        try:
-            index = lines.index(passedTests)
-        except ValueError:
-            index = -1
-
-        if index < 0:
-            try:
-                index = lines.index(introFailedTests)
-            except ValueError:
-                index = -1
-
-            if index >= 0:
-                index += 2
-                line = lines[index]
-
-                while line != endFailedTests:
-                    name = line.split('      ')[0] + '; '
-                    fails[2] += name
-                    fails[0] += '\t ' + line
-                    fails[1] += 1
-                    index += 1
-                    line = lines[index]
-        else:
-            allTestsPassed = True
-
-        f.close()
-
-        count1 += fails[1]
-
-        endRow = j + 2
-        wrks2.write(endRow, startCol, j + 1)
-        wrks2.write(endRow, startCol + 1, fails[2])
-
-        #=========================
-        # ------- ALPHABIT -------
-        #=========================
-        nameAlphabit = 'alphabit-output.txt'
-        filename = os.path.join(set, nameAlphabit)
-
-        with open(filename) as f:
+    for nist_dir in nist_dirs:
+        filepath = os.path.join(NIST_PATH, nist_dir, NIST_SUBDIR.lstrip('/'))
+        if not os.path.isfile(filepath):
+            continue
+            
+        with open(filepath, 'r') as f:
             lines = f.readlines()
+            
+        # Extract bin name from file
+        bin_name = lines[3].split('/')[-1].split('.')[0] if len(lines) > 3 else nist_dir
+        
+        result = TestResult()
+        
+        for line in lines:
+            if FAILED_NIST_MARKER in line:
+                test_name = line.split(' ')[-1].strip() + '; '
+                result.failed_names += test_name
+                
+                # Check if failure is within statistical fluctuations
+                if _is_nist_failure_acceptable(line):
+                    result.failed_details += '\t ' + line
+                    result.failed_count += 1
+                else:
+                    # Critical failure - discard bin
+                    result.bad_fails_details += '\t ' + line
+                    result.bad_fails_count += 1
+        
+        results[bin_name] = result
+    
+    return results
 
-            fails = ['', 0, '']
-            try:
-                index = lines.index(passedTests)
-            except ValueError:
-                index = -1
 
-            if index < 0:
-                try:
-                    index = lines.index(introFailedTests)
-                except ValueError:
-                    index = -1
+def _is_nist_failure_acceptable(line: str) -> bool:
+    """
+    Check if a NIST failure is within acceptable statistical fluctuations.
+    Returns True if acceptable, False if critical.
+    """
+    matches = re.findall(r'(\d+)\s*/\s*(\d+)', line)
+    if not matches:
+        return True
+    
+    num_str, den_str = matches[-1]
+    num = int(num_str)
+    den = int(den_str)
+    
+    expectation = den * NIST_EXPECTATION_RATE
+    sigma = math.sqrt(den * NIST_EXPECTATION_RATE * NIST_FAILURE_RATE)
+    
+    lower_bound = expectation - sigma * NIST_SIGMA_THRESHOLD - 2
+    upper_bound = expectation + sigma * NIST_SIGMA_THRESHOLD + 2
+    
+    return lower_bound <= num <= upper_bound
 
-                if index >= 0:
-                    index += 2
-                    line = lines[index]
 
-                    while line != endFailedTests:
-                        name = line.split('     ')[0] + '; '
-                        fails[2] += name
-                        fails[0] += '\t ' + line
-                        fails[1] += 1
-                        index += 1
-                        line = lines[index]
-            else:
-                allTestsPassed = True
+# ============================================================================
+# RABBIT TEST PARSING
+# ============================================================================
 
-            f.close()
+def parse_rabbit_results() -> Dict[str, TestResult]:
+    """Parse Rabbit test results from all files."""
+    if not os.path.isdir(RABBIT_PATH):
+        return {}
+    
+    results = {}
+    file_list = [f for f in Path(RABBIT_PATH).iterdir() if f.is_file()]
+    
+    for filepath in file_list:
+        with open(filepath, 'r') as f:
+            lines = f.readlines()
+        
+        # Extract bin name
+        bin_name = lines[9].split('/')[-1].split('.')[0] if len(lines) > 9 else filepath.stem
+        
+        result = TestResult()
+        result.failed_details, result.failed_count, result.failed_names = \
+            _parse_test_failures(lines)
+        
+        results[bin_name] = result
+    
+    return results
 
-    wrks2.write(2, startCol + 2, fails[2])
 
-    wrks2.write(endRow + 4, startCol, 'TOTAL:', results_format)
-    wrks2.write(endRow + 4, startCol + 1, count1)
-    wrks2.write(endRow + 4, startCol + 2, fails[1])
+# ============================================================================
+# IID TEST PARSING
+# ============================================================================
 
-    wrks2.write(endRow + 5, startCol, 'RESULT:', results_format)
+def parse_iid_results() -> Dict[str, TestResult]:
+    """Parse IID test results from all directories."""
+    if not os.path.isdir(IID_PATH):
+        return {}
+    
+    results = {}
+    iid_dirs = os.listdir(IID_PATH)
+    
+    for iid_dir in iid_dirs:
+        bin_name = iid_dir.split('@')[0]
+        log_path = os.path.join(IID_PATH, iid_dir, f'{iid_dir}.log')
+        
+        if not os.path.isfile(log_path):
+            continue
+        
+        result = TestResult()
+        
+        with open(log_path, 'r') as f:
+            for line in f:
+                if "IID assumption validated" in line:
+                    result.iid_validation = "VALIDATED"
+                elif "IID assumption rejected" in line:
+                    result.iid_validation = "REJECTED"
+                elif "RaP min-entropy" in line:
+                    result.min_entropy = line.split("INFO     ")[-1]
+        
+        results[bin_name] = result
+    
+    return results
 
-    if not count1 and not fails[1]:
-        wrks2.write(endRow + 5, startCol + 1, 'Golden', results_format)
-    elif count1 < 6 and not fails[1]:
-        wrks2.write(endRow + 5, startCol + 1, 'Silver', results_format)
-    elif count1 <6 and fails[1] == 1:
-        wrks2.write(endRow + 5, startCol + 1, 'Bronze', results_format)
+
+# ============================================================================
+# CRUSH & ALPHABIT TEST PARSING
+# ============================================================================
+
+def parse_crush_results(set_dir: str) -> Tuple[List[TestResult], int]:
+    """
+    Parse Crush test results from a set directory.
+    Returns list of test results and total failure count.
+    """
+    file_pattern = r'([0-9]|).-output-crush-multi.txt'
+    file_list = [f for f in os.listdir(set_dir) if re.match(file_pattern, f)]
+    file_list = natsort.natsorted(file_list)
+    
+    results = []
+    total_failures = 0
+    
+    for filename in file_list:
+        filepath = os.path.join(set_dir, filename)
+        with open(filepath, 'r') as f:
+            lines = f.readlines()
+        
+        result = TestResult()
+        result.failed_details, result.failed_count, result.failed_names = \
+            _parse_test_failures(lines)
+        
+        results.append(result)
+        total_failures += result.failed_count
+    
+    return results, total_failures
+
+
+def parse_alphabit_results(set_dir: str) -> TestResult:
+    """Parse Alphabit test results from a set directory."""
+    filepath = os.path.join(set_dir, 'alphabit-output.txt')
+    
+    if not os.path.isfile(filepath):
+        return TestResult()
+    
+    with open(filepath, 'r') as f:
+        lines = f.readlines()
+    
+    result = TestResult()
+    # Alphabit uses 5 spaces as separator instead of 6
+    result.failed_details, result.failed_count, result.failed_names = \
+        _parse_test_failures(lines, separator='     ')
+    
+    return result
+
+
+def _parse_test_failures(lines: List[str], separator: str = '      ') -> Tuple[str, int, str]:
+    """
+    Generic parser for test failures from TestU01 output format.
+    Returns: (failed_details, failed_count, failed_names)
+    
+    Args:
+        lines: Output file lines
+        separator: String of spaces separating test name from p-value (default: 6 spaces)
+    """
+    if PASSED_TESTS in lines:
+        return '', 0, ''
+    
+    try:
+        index = lines.index(INTRO_FAILED_TESTS)
+    except ValueError:
+        return '', 0, ''
+    
+    failed_details = ''
+    failed_count = 0
+    failed_names = ''
+    
+    index += 2
+    
+    while index < len(lines) and lines[index] != END_FAILED_TESTS:
+        line = lines[index]
+        # Split by whitespace gap to preserve full test name
+        test_name = line.split(separator)[0] + '; '
+        
+        failed_names += test_name
+        failed_details += '\t ' + line
+        failed_count += 1
+        index += 1
+    
+    return failed_details, failed_count, failed_names
+
+
+# ============================================================================
+# RESULT CATEGORIZATION
+# ============================================================================
+
+def categorize_bin_results(bins: Dict[str, Dict[str, TestResult]]) -> Dict[str, int]:
+    """
+    Categorize bins into Gold, Silver, Bronze, and Discarded.
+    """
+    counts = {'gold': 0, 'silver': 0, 'bronze': 0, 'discarded': 0}
+    
+    for bin_name, tests in bins.items():
+        nist = tests['Nist']
+        rabbit = tests['Rabbit']
+        
+        # Gold: no failures at all
+        if not nist.bad_fails_count and not nist.failed_count and not rabbit.failed_count:
+            counts['gold'] += 1
+        
+        # Silver: 1 NIST statistical fail OR 1 Rabbit fail
+        elif (not nist.bad_fails_count and nist.failed_count == 1 and not rabbit.failed_count) or \
+             (not nist.bad_fails_count and not nist.failed_count and rabbit.failed_count == 1):
+            counts['silver'] += 1
+        
+        # Bronze: 2 NIST statistical fails OR (1 NIST + 1 Rabbit)
+        elif (not nist.bad_fails_count and nist.failed_count == 2 and not rabbit.failed_count) or \
+             (not nist.bad_fails_count and nist.failed_count == 1 and rabbit.failed_count == 1):
+            counts['bronze'] += 1
+        
+        # Discarded: everything else
+        else:
+            counts['discarded'] += 1
+    
+    return counts
+
+
+def categorize_set_result(crush_failures: int, alphabit_failures: int) -> str:
+    """Categorize a set based on Crush and Alphabit failures."""
+    if crush_failures == 0 and alphabit_failures == 0:
+        return 'Golden'
+    elif crush_failures < 6 and alphabit_failures == 0:
+        return 'Silver'
+    elif crush_failures < 6 and alphabit_failures == 1:
+        return 'Bronze'
     else:
-        wrks2.write(endRow + 5, startCol + 1, 'Discarded', results_format)
+        return 'Discarded'
 
 
-wrks3 = workbook.add_worksheet('IID Details')
+# ============================================================================
+# EXCEL REPORT GENERATION
+# ============================================================================
 
-startCol = 0
-endCol = 1
+def create_excel_formats(workbook: xlsxwriter.Workbook) -> Dict[str, xlsxwriter.format.Format]:
+    """Create and return all Excel cell formats."""
+    return {
+        'merge': workbook.add_format({
+            'bold': 1,
+            'border': 1,
+            'align': 'center',
+            'valign': 'vcenter',
+            'font_color': 'blue',
+            'font_size': 13
+        }),
+        'title': workbook.add_format({
+            'bold': 1,
+            'border': 1,
+            'align': 'center',
+            'valign': 'vcenter'
+        }),
+        'results': workbook.add_format({
+            'bold': 1,
+            'align': 'center',
+            'valign': 'vcenter',
+            'font_color': 'red'
+        })
+    }
 
-wrks3.set_column(startCol, endCol, 15)
-wrks3.write(0, startCol, 'File', title_format)
-wrks3.write(0, startCol + 1, 'IID', title_format)
-wrks3.write(0, startCol + 2, 'Min Entropy', title_format)
 
-for j, x in enumerate(binsList):
-    wrks3.write(1 + j, startCol, x)
-    if binsList[x]['IID'][0] is not None:
-        wrks3.write(1 + j, startCol + 1, binsList[x]['IID'][0])       #IID result
-        wrks3.write(1 + j, startCol + 2, binsList[x]['IID'][1])       #MIN ENTROPY
-    else:
-        wrks3.write(1 + j, startCol + 1, "No IID test performed")  #IID result
+def write_nist_rabbit_sheet(worksheet: xlsxwriter.worksheet.Worksheet,
+                            bins: Dict[str, Dict[str, TestResult]],
+                            formats: Dict[str, xlsxwriter.format.Format]) -> None:
+    """Write the NIST & Rabbit results worksheet."""
+    # Header
+    worksheet.merge_range(0, 0, 0, 5, 'NIST & RABBIT', formats['merge'])
+    
+    # Column setup
+    worksheet.set_column(0, 5, EXCEL_COL_WIDTH)
+    headers = ['File', 'NIST Failed Tests', 'NIST Bad Fails', 
+               'NIST Stat. Fails', 'Rabbit Failed Tests', 'Rabbit']
+    
+    for col, header in enumerate(headers):
+        worksheet.write(1, col, header, formats['title'])
+    
+    # Data rows
+    for row, (bin_name, tests) in enumerate(bins.items(), start=2):
+        worksheet.write(row, 0, bin_name)
+        worksheet.write(row, 1, tests['Nist'].failed_names)
+        worksheet.write(row, 2, tests['Nist'].bad_fails_count)
+        worksheet.write(row, 3, tests['Nist'].failed_count)
+        worksheet.write(row, 4, tests['Rabbit'].failed_names)
+        worksheet.write(row, 5, tests['Rabbit'].failed_count)
+    
+    # Summary statistics
+    counts = categorize_bin_results(bins)
+    
+    summary_row = 5
+    worksheet.write(summary_row, 8, 'BIN RESULTS:', formats['results'])
+    worksheet.write(summary_row + 1, 8, 'Golden:', formats['results'])
+    worksheet.write(summary_row + 2, 8, 'Silver:', formats['results'])
+    worksheet.write(summary_row + 3, 8, 'Bronze:', formats['results'])
+    worksheet.write(summary_row + 4, 8, 'Discarded:', formats['results'])
+    worksheet.write(summary_row + 5, 8, 'TOTAL:', formats['results'])
+    
+    worksheet.write(summary_row + 1, 9, counts['gold'])
+    worksheet.write(summary_row + 2, 9, counts['silver'])
+    worksheet.write(summary_row + 3, 9, counts['bronze'])
+    worksheet.write(summary_row + 4, 9, counts['discarded'])
+    worksheet.write(summary_row + 5, 9, sum(counts.values()))
 
-workbook.close()
+
+def write_crush_alphabit_sheet(worksheet: xlsxwriter.worksheet.Worksheet,
+                               set_dirs: List[str],
+                               formats: Dict[str, xlsxwriter.format.Format]) -> None:
+    """Write the Crush & Alphabit results worksheet."""
+    for i, set_dir in enumerate(set_dirs):
+        start_col = i * 4
+        
+        # Header
+        worksheet.merge_range(0, start_col, 0, start_col + 3, 
+                            f'Set {i + 1}', formats['merge'])
+        worksheet.merge_range(1, start_col, 1, start_col + 2,
+                            'Crush (testID / # iterations / fails)', formats['title'])
+        worksheet.write(1, start_col + 3, 'Alphabit', formats['title'])
+        worksheet.set_column(start_col + 1, start_col + 3, EXCEL_COL_WIDTH)
+        
+        # Parse results
+        crush_results, total_crush_failures = parse_crush_results(set_dir)
+        alphabit_result = parse_alphabit_results(set_dir)
+        
+        # Write Crush results
+        for j, result in enumerate(crush_results):
+            row = j + 2
+            test_id = j + 1
+            iterations = crush_test_iterations.get(test_id, 'N/A')
+            
+            worksheet.write(row, start_col, test_id)
+            worksheet.write(row, start_col + 1, iterations)
+            worksheet.write(row, start_col + 2, result.failed_names)
+        
+        # Write Alphabit result
+        worksheet.write(2, start_col + 3, alphabit_result.failed_names)
+        
+        # Write summary
+        end_row = len(crush_results) + 2
+        worksheet.write(end_row + 2, start_col + 1, 'TOTAL:', formats['results'])
+        worksheet.write(end_row + 2, start_col + 2, total_crush_failures)
+        worksheet.write(end_row + 2, start_col + 3, alphabit_result.failed_count)
+        
+        worksheet.write(end_row + 3, start_col + 1, 'RESULT:', formats['results'])
+        category = categorize_set_result(total_crush_failures, alphabit_result.failed_count)
+        worksheet.write(end_row + 3, start_col + 2, category, formats['results'])
+
+
+def write_iid_sheet(worksheet: xlsxwriter.worksheet.Worksheet,
+                   bins: Dict[str, Dict[str, TestResult]],
+                   formats: Dict[str, xlsxwriter.format.Format]) -> None:
+    """Write the IID Details worksheet."""
+    # Headers
+    worksheet.set_column(0, 2, EXCEL_COL_WIDTH)
+    worksheet.write(0, 0, 'File', formats['title'])
+    worksheet.write(0, 1, 'IID', formats['title'])
+    worksheet.write(0, 2, 'Min Entropy', formats['title'])
+    
+    # Data rows
+    for row, (bin_name, tests) in enumerate(bins.items(), start=1):
+        worksheet.write(row, 0, bin_name)
+        
+        iid = tests.get('IID')
+        if iid and iid.iid_validation is not None:
+            worksheet.write(row, 1, iid.iid_validation)
+            worksheet.write(row, 2, iid.min_entropy or '')
+        else:
+            worksheet.write(row, 1, "No IID test performed")
+
+
+# ============================================================================
+# MAIN EXECUTION
+# ============================================================================
+
+def generate_report() -> None:
+    """Main function to generate the complete Excel report."""
+    # Generate report filename
+    try:
+        current_dir = os.getcwd().replace('\\', '/').split('/')[-1] + "_"
+    except:
+        current_dir = ""
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_name = f'{current_dir}{timestamp}_report'
+    
+    # Parse all test results
+    nist_results = parse_nist_results()
+    rabbit_results = parse_rabbit_results()
+    iid_results = parse_iid_results()
+    
+    # Combine results by bin
+    all_bins = set(nist_results.keys()) | set(rabbit_results.keys()) | set(iid_results.keys())
+    bins = {}
+    
+    for bin_name in all_bins:
+        bins[bin_name] = {
+            'Nist': nist_results.get(bin_name, TestResult()),
+            'Rabbit': rabbit_results.get(bin_name, TestResult()),
+            'IID': iid_results.get(bin_name, TestResult())
+        }
+    
+    # Find set directories
+    set_dirs = [d for d in os.listdir('.') if d.startswith('set') and os.path.isdir(d)]
+    
+    # Create Excel workbook
+    workbook = xlsxwriter.Workbook(f'{report_name}.xlsx')
+    formats = create_excel_formats(workbook)
+    
+    # Generate worksheets
+    wrks1 = workbook.add_worksheet('NIST & Rabbit')
+    write_nist_rabbit_sheet(wrks1, bins, formats)
+    
+    if set_dirs:
+        wrks2 = workbook.add_worksheet('Crush & Alphabit')
+        write_crush_alphabit_sheet(wrks2, set_dirs, formats)
+    
+    wrks3 = workbook.add_worksheet('IID Details')
+    write_iid_sheet(wrks3, bins, formats)
+    
+    workbook.close()
+    print(f"Report generated: {report_name}.xlsx")
+
+
+if __name__ == '__main__':
+    generate_report()
