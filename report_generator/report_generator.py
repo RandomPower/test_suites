@@ -14,7 +14,7 @@ from typing import Dict, List, Tuple, Optional
 import natsort
 import xlsxwriter
 
-from crush_lut import crush_test_iterations
+from crush_lut import crush_test_iterations, crush_subtests_per_iteration
 
 
 # ============================================================================
@@ -277,6 +277,38 @@ def _parse_test_failures(lines: List[str], separator: str = '      ') -> Tuple[s
 
 
 # ============================================================================
+# UTILITY FUNCTIONS
+# ============================================================================
+
+def deduplicate_test_names(failed_names: str) -> str:
+    """
+    Deduplicate test names and show count for repeated tests.
+    Input: "MaxOft, t = 20; MaxOft, t = 20; MaxOft AD, t = 20; MaxOft AD, t = 20;"
+    Output: "MaxOft, t = 20 (2x); MaxOft AD, t = 20 (2x)"
+    """
+    if not failed_names:
+        return ''
+    
+    # Split by semicolon and clean up
+    tests = [t.strip() for t in failed_names.split(';') if t.strip()]
+    
+    # Count occurrences
+    test_counts = {}
+    for test in tests:
+        test_counts[test] = test_counts.get(test, 0) + 1
+    
+    # Format output
+    result = []
+    for test, count in test_counts.items():
+        if count > 1:
+            result.append(f"{test} ({count}x)")
+        else:
+            result.append(test)
+    
+    return '; '.join(result)
+
+
+# ============================================================================
 # RESULT CATEGORIZATION
 # ============================================================================
 
@@ -395,47 +427,105 @@ def write_nist_rabbit_sheet(worksheet: xlsxwriter.worksheet.Worksheet,
     worksheet.write(summary_row + 5, 9, sum(counts.values()))
 
 
-def write_crush_alphabit_sheet(worksheet: xlsxwriter.worksheet.Worksheet,
-                               set_dirs: List[str],
-                               formats: Dict[str, xlsxwriter.format.Format]) -> None:
-    """Write the Crush & Alphabit results worksheet."""
+def write_detailed_analysis_sheet(worksheet: xlsxwriter.worksheet.Worksheet,
+                                  set_dirs: List[str],
+                                  formats: Dict[str, xlsxwriter.format.Format]) -> None:
+    """Write the detailed analysis worksheet with intelligent test summaries."""
     for i, set_dir in enumerate(set_dirs):
-        start_col = i * 4
+        start_col = i * 7
         
         # Header
-        worksheet.merge_range(0, start_col, 0, start_col + 3, 
-                            f'Set {i + 1}', formats['merge'])
-        worksheet.merge_range(1, start_col, 1, start_col + 2,
-                            'Crush (testID / # iterations / fails)', formats['title'])
-        worksheet.write(1, start_col + 3, 'Alphabit', formats['title'])
-        worksheet.set_column(start_col + 1, start_col + 3, EXCEL_COL_WIDTH)
+        worksheet.merge_range(0, start_col, 0, start_col + 6, 
+                            f'Set {i + 1} - Crush & Alphabit', formats['merge'])
+        
+        # Column headers
+        worksheet.write(1, start_col, 'Test ID', formats['title'])
+        worksheet.write(1, start_col + 1, 'Iterations', formats['title'])
+        worksheet.write(1, start_col + 2, 'Subtests', formats['title'])
+        worksheet.write(1, start_col + 3, 'Failures', formats['title'])
+        worksheet.write(1, start_col + 4, 'Rate %', formats['title'])
+        worksheet.write(1, start_col + 5, 'Status', formats['title'])
+        worksheet.write(1, start_col + 6, 'Failed Tests (unique)', formats['title'])
+        
+        worksheet.set_column(start_col, start_col, 10)
+        worksheet.set_column(start_col + 1, start_col + 3, 12)
+        worksheet.set_column(start_col + 4, start_col + 4, 10)
+        worksheet.set_column(start_col + 5, start_col + 5, 15)
+        worksheet.set_column(start_col + 6, start_col + 6, 30)
         
         # Parse results
         crush_results, total_crush_failures = parse_crush_results(set_dir)
         alphabit_result = parse_alphabit_results(set_dir)
         
-        # Write Crush results
+        # Analyze and write Crush results
         for j, result in enumerate(crush_results):
             row = j + 2
             test_id = j + 1
-            iterations = crush_test_iterations.get(test_id, 'N/A')
+            iterations = crush_test_iterations.get(test_id, 1)
+            subtests_per_iteration = crush_subtests_per_iteration.get(test_id, 1)
+            
+            # Calculate metrics
+            if isinstance(iterations, int) and iterations > 0:
+                total_possible_failures = iterations * subtests_per_iteration
+                
+                if total_possible_failures > 0:
+                    failure_rate = (result.failed_count / total_possible_failures) * 100
+                else:
+                    # All tests passed (subtests_per_iteration might be 0 for passed tests)
+                    failure_rate = 0.0
+                
+                # Determine status
+                if result.failed_count == 0:
+                    status = 'PASSED'
+                elif failure_rate >= 80:
+                    status = 'CRITICAL'
+                elif failure_rate >= 50:
+                    status = 'HIGH'
+                elif failure_rate >= 20:
+                    status = 'MEDIUM'
+                else:
+                    status = 'LOW'
+            else:
+                failure_rate = 0
+                status = 'N/A'
+            
+            # Deduplicate test names
+            unique_tests = deduplicate_test_names(result.failed_names)
             
             worksheet.write(row, start_col, test_id)
             worksheet.write(row, start_col + 1, iterations)
-            worksheet.write(row, start_col + 2, result.failed_names)
+            worksheet.write(row, start_col + 2, subtests_per_iteration)
+            worksheet.write(row, start_col + 3, result.failed_count)
+            worksheet.write(row, start_col + 4, f'{failure_rate:.1f}%')
+            worksheet.write(row, start_col + 5, status)
+            worksheet.write(row, start_col + 6, unique_tests)
         
-        # Write Alphabit result
-        worksheet.write(2, start_col + 3, alphabit_result.failed_names)
-        
-        # Write summary
+        # Alphabit analysis
         end_row = len(crush_results) + 2
-        worksheet.write(end_row + 2, start_col + 1, 'TOTAL:', formats['results'])
-        worksheet.write(end_row + 2, start_col + 2, total_crush_failures)
-        worksheet.write(end_row + 2, start_col + 3, alphabit_result.failed_count)
+        worksheet.write(end_row + 1, start_col, 'Alphabit', formats['title'])
+        worksheet.write(end_row + 1, start_col + 3, alphabit_result.failed_count)
         
-        worksheet.write(end_row + 3, start_col + 1, 'RESULT:', formats['results'])
+        if alphabit_result.failed_count == 0:
+            alphabit_status = 'PASSED'
+        elif alphabit_result.failed_count == 1:
+            alphabit_status = 'WARNING'
+        else:
+            alphabit_status = 'FAILED'
+        
+        worksheet.write(end_row + 1, start_col + 5, alphabit_status)
+        
+        # Deduplicated Alphabit failures
+        unique_alphabit = deduplicate_test_names(alphabit_result.failed_names)
+        worksheet.write(end_row + 1, start_col + 6, unique_alphabit)
+        
+        # Overall summary
+        worksheet.write(end_row + 3, start_col, 'OVERALL', formats['results'])
+        worksheet.write(end_row + 3, start_col + 1, 'Crush Total:', formats['results'])
+        worksheet.write(end_row + 3, start_col + 3, total_crush_failures)
+        
         category = categorize_set_result(total_crush_failures, alphabit_result.failed_count)
-        worksheet.write(end_row + 3, start_col + 2, category, formats['results'])
+        worksheet.write(end_row + 4, start_col + 1, 'Category:', formats['results'])
+        worksheet.write(end_row + 4, start_col + 3, category, formats['results'])
 
 
 def write_iid_sheet(worksheet: xlsxwriter.worksheet.Worksheet,
@@ -503,8 +593,8 @@ def generate_report() -> None:
     write_nist_rabbit_sheet(wrks1, bins, formats)
     
     if set_dirs:
-        wrks2 = workbook.add_worksheet('Crush & Alphabit')
-        write_crush_alphabit_sheet(wrks2, set_dirs, formats)
+        wrks_analysis = workbook.add_worksheet('Crush & Alphabit')
+        write_detailed_analysis_sheet(wrks_analysis, set_dirs, formats)
     
     wrks3 = workbook.add_worksheet('IID Details')
     write_iid_sheet(wrks3, bins, formats)
