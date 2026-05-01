@@ -167,7 +167,7 @@ void TestU01Wrapper::RunRabbit(vector<string> *bin_files)
             streamsize file_size = in_file.tellg();
             in_file.close();
 
-            bbattery_RabbitFile(const_cast<char *>(bin_file.c_str()), static_cast<double>(file_size));
+            bbattery_RabbitFile(const_cast<char *>(bin_file.c_str()), static_cast<double>(file_size*8));
 
             cout << "====================Test End====================" << endl;
 
