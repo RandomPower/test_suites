@@ -6,7 +6,7 @@ Repo containing an automatic procedure to run the NIST test suite and TestU01 wi
   (non-interactive command line, OpenMP, faster counting with byte-identical output). See `nist_tests/README.MD`.
 - `rap_testu01/`: our TestU01 runner. TestU01 1.2.3 itself is downloaded by CMake at a fixed upstream commit.
 - `external/IID_validation`: git submodule with the IID validation procedure (NIST SP 800-90B permutation tests),
-  pinned to a fixed version. The tests run with its compiled Rust backend.
+  pinned to a release of IID_validation (currently v1.1.0). The tests run with its compiled Rust backend.
 - `report_generator/`: builds the final Excel report.
 
 ## Installation
