@@ -3,6 +3,13 @@ Run builder.sh to compile the TestU01 library and to link it with the test runne
 ./builder.sh
 ```
 
+TestU01 is not stored in this repository: CMake downloads the official TestU01 1.2.3
+sources (https://github.com/umontreal-simul/TestU01-2009, fixed commit `a038a86`) and
+builds them as static libraries inside `build/`. Requirements: git, make,
+cmake >= 3.22 and access to github.com during the build. See the comments in
+`CMakeLists.txt` for the build options that make TestU01 compile with recent
+compilers (GCC 15) and autotools.
+
 The ./rap_testu01 executable must be placed in a generic directory where anybody can have access to run the tests.
 For example, in /usr/local/bin/, the structure will look as follows:
 
