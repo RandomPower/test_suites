@@ -16,15 +16,15 @@
                   Revised by J. Soto, November 1999
                   Revised by Larry Bassham, March 2008
 
-   Keywords    :  Pseudorandom Number Generator (PRNG), Randomness, Statistical
-                  Tests, Complementary Error functions, Incomplete Gamma
-                  Function, Random Walks, Rank, Fast Fourier Transform,
+   Keywords    :  Pseudorandom Number Generator (PRNG), Randomness, Statistical 
+                  Tests, Complementary Error functions, Incomplete Gamma 
+                  Function, Random Walks, Rank, Fast Fourier Transform, 
                   Template, Cryptographically Secure PRNG (CSPRNG),
-                  Approximate Entropy (ApEn), Secure Hash Algorithm (SHA-1),
-                  Blum-Blum-Shub (BBS) CSPRNG, Micali-Schnorr (MS) CSPRNG,
+                  Approximate Entropy (ApEn), Secure Hash Algorithm (SHA-1), 
+                  Blum-Blum-Shub (BBS) CSPRNG, Micali-Schnorr (MS) CSPRNG, 
 
-   Source      :  David Banks, Elaine Barker, James Dray, Allen Heckert,
-                  Stefan Leigh, Mark Levenson, James Nechvatal, Andrew Rukhin,
+   Source      :  David Banks, Elaine Barker, James Dray, Allen Heckert, 
+                  Stefan Leigh, Mark Levenson, James Nechvatal, Andrew Rukhin, 
                   Miles Smid, Juan Soto, Mark Vangel, and San Vo.
 
    Technical
@@ -35,10 +35,10 @@
 
    Limitation  :  Amount of memory allocated for workspace.
 
-   Restrictions:  Permission to use, copy, and modify this software without
-                  fee is hereby granted, provided that this entire notice is
+   Restrictions:  Permission to use, copy, and modify this software without 
+                  fee is hereby granted, provided that this entire notice is 
                   included in all copies of any software which is or includes
-                  a copy or modification of this software and in all copies
+                  a copy or modification of this software and in all copies 
                   of the supporting documentation for such software.
    -------------------------------------------------------------------------- */
 
@@ -47,14 +47,13 @@
 #include <math.h>
 #include <string.h>
 #include "../include/decls.h"
-#include "../include/cephes.h"
+#include "../include/cephes.h"  
 #include "../include/utilities.h"
 
 void	partitionResultFile(int numOfFiles, int numOfSequences, int option, int testNameID);
 void	postProcessResults(int option);
 int		cmp(const double *a, const double *b);
 int		computeMetrics(char *s, int test);
-char *nistdir;
 
 int
 main(int argc, char *argv[])
@@ -62,36 +61,12 @@ main(int argc, char *argv[])
 	int		i;
 	int		option;			/* TEMPLATE LENGTH/STREAM LENGTH/GENERATOR*/
 	char	*streamFile;	/* STREAM FILENAME     */
-  char    file[200];
-  FILE    *fp;
-	int	numberofbitstreams;
+	
 
-
-	if ( argc != 8 ) {
-		printf("Usage: %s <stream length>  -i <inputbitstream file> -f <inputfileformat> -n <numofbitstreams>\n", argv[0]);
+	if ( argc != 2 ) {
+		printf("Usage: %s <stream length>\n", argv[0]);
 		printf("   <stream length> is the length of the individual bit stream(s) to be processed\n");
-                printf("   <inputbitstream file> is the input file path to be processed\n");
-                printf("   <inputfileformat> is the input file format 0 ASCII - 1 Binary \n");
 		return 0;
-	}
-	if(argc==8)
-	{ /* If the user has specified the option -c */
-    	streamFile = (char*)calloc(200, sizeof(char));
-	//strncpy(file,argv[3],sizeof(argv[3]));
-	sprintf(streamFile, "%s", argv[3]);
-	printf("File: %s\n",streamFile);
-  if ( (fp = fopen(streamFile, "r")) == NULL )
-	{
-  	printf("File Error:  file %s could not be opened.\n",  streamFile);
-  	exit(-1);
-  }
-  else
-	{
-    fclose(fp);
-			//printf("Sono qui\n");
-	}
-    numberofbitstreams = atoi(argv[7]);
-	printf("BitStreams in file: %d\n",numberofbitstreams);
 	}
 
 	tp.n = atoi(argv[1]);
@@ -102,12 +77,11 @@ main(int argc, char *argv[])
 	tp.serialBlockLength = 16;
 	tp.linearComplexitySequenceLength = 500;
 	tp.numOfBitStreams = 1;
-	option = 0;//generatorOptions(&streamFile);
+	option = generatorOptions(&streamFile);
 	chooseTests();
-	//testVector[0]=1;
 	fixParameters();
-	openOutputStreams(option,numberofbitstreams);
-	invokeTestSuite(option, streamFile,atoi(argv[5]));
+	openOutputStreams(option);
+	invokeTestSuite(option, streamFile);
 	fclose(freqfp);
 	for( i=1; i<=NUMOFTESTS; i++ ) {
 		if ( stats[i] != NULL )
@@ -115,14 +89,14 @@ main(int argc, char *argv[])
 		if ( results[i] != NULL )
 			fclose(results[i]);
 	}
-	if ( (testVector[0] == 1) || (testVector[TEST_CUSUM] == 1) )
+	if ( (testVector[0] == 1) || (testVector[TEST_CUSUM] == 1) ) 
 		partitionResultFile(2, tp.numOfBitStreams, option, TEST_CUSUM);
-	if ( (testVector[0] == 1) || (testVector[TEST_NONPERIODIC] == 1) )
+	if ( (testVector[0] == 1) || (testVector[TEST_NONPERIODIC] == 1) ) 
 		partitionResultFile(MAXNUMOFTEMPLATES, tp.numOfBitStreams, option, TEST_NONPERIODIC);
 	if ( (testVector[0] == 1) || (testVector[TEST_RND_EXCURSION] == 1) )
 		partitionResultFile(8, tp.numOfBitStreams, option, TEST_RND_EXCURSION);
 	if ( (testVector[0] == 1) || (testVector[TEST_RND_EXCURSION_VAR] == 1) )
-	        partitionResultFile(18, tp.numOfBitStreams, option, TEST_RND_EXCURSION_VAR);
+		partitionResultFile(18, tp.numOfBitStreams, option, TEST_RND_EXCURSION_VAR);
 	if ( (testVector[0] == 1) || (testVector[TEST_SERIAL] == 1) )
 		partitionResultFile(2, tp.numOfBitStreams, option, TEST_SERIAL);
 	fprintf(summary, "------------------------------------------------------------------------------\n");
@@ -140,33 +114,32 @@ main(int argc, char *argv[])
 
 void
 partitionResultFile(int numOfFiles, int numOfSequences, int option, int testNameID)
-{
+{ 
 	int		i, k, m, j, start, end, num, numread;
 	float	c;
 	FILE	**fp = (FILE **)calloc(numOfFiles+1, sizeof(FILE *));
 	int		*results = (int *)calloc(numOfFiles, sizeof(int *));
 	char	*s[MAXFILESPERMITTEDFORPARTITION];
 	char	resultsDir[200];
-	char *nistdir = getenv("NISTFOLDER");
-
+	
 	for ( i=0; i<MAXFILESPERMITTEDFORPARTITION; i++ )
 		s[i] = (char*)calloc(200, sizeof(char));
-
-	sprintf(resultsDir, "nist_results/%s/%s/%s/results.txt", nistdir,generatorDir[option], testNames[testNameID]);
-
+	
+	sprintf(resultsDir, "experiments/%s/%s/results.txt", generatorDir[option], testNames[testNameID]);
+	
 	if ( (fp[numOfFiles] = fopen(resultsDir, "r")) == NULL ) {
 		printf("%s", resultsDir);
 		printf(" -- file not found. Exiting program.\n");
 		exit(-1);
 	}
-
+	
 	for ( i=0; i<numOfFiles; i++ ) {
 		if ( i < 10 )
-			sprintf(s[i], "nist_results/%s/%s/%s/data%1d.txt", nistdir,generatorDir[option], testNames[testNameID], i+1);
+			sprintf(s[i], "experiments/%s/%s/data%1d.txt", generatorDir[option], testNames[testNameID], i+1);
 		else if (i < 100)
-			sprintf(s[i], "nist_results/%s/%s/%s/data%2d.txt", nistdir,generatorDir[option], testNames[testNameID], i+1);
+			sprintf(s[i], "experiments/%s/%s/data%2d.txt", generatorDir[option], testNames[testNameID], i+1);
 		else
-			sprintf(s[i], "nist_results/%s/%s/%s/data%3d.txt", nistdir,generatorDir[option], testNames[testNameID], i+1);
+			sprintf(s[i], "experiments/%s/%s/data%3d.txt", generatorDir[option], testNames[testNameID], i+1);
 	}
 	numread = 0;
 	m = numOfFiles/20;
@@ -182,12 +155,12 @@ partitionResultFile(int numOfFiles, int numOfSequences, int option, int testName
 	}
 	for ( num=0; num<numOfSequences; num++ ) {
 		for ( k=0; k<m; k++ ) { 			/* FOR EACH BATCH */
-
+			
 			start = k*20;		/* BOUNDARY SEGMENTS */
 			end   = k*20+19;
 			if ( k == (m-1) )
 				end = numOfFiles-1;
-
+			
 			for ( i=start; i<=end; i++ ) {		/* OPEN FILE */
 				if ( (fp[i] = fopen(s[i], "a")) == NULL ) {
 					printf("%s", s[i]);
@@ -195,7 +168,7 @@ partitionResultFile(int numOfFiles, int numOfSequences, int option, int testName
 					exit(-1);
 				}
 			}
-
+			
 			for ( j=start; j<=end; j++ ) {		/* POPULATE FILE */
 				fscanf(fp[numOfFiles], "%f", &c);
 				fprintf(fp[j], "%f\n", c);
@@ -230,40 +203,39 @@ postProcessResults(int option)
 	int		passRate, case1, case2, numOfFiles = 2;
 	double	p_hat;
 	char	s[200];
-	char *nistdir= getenv("NISTFOLDER");
-
+	
 	for ( i=1; i<=NUMOFTESTS; i++ ) {		// FOR EACH TEST
 		if ( testVector[i] ) {
 			// SPECIAL CASES -- HANDLING MULTIPLE FILES FOR A SINGLE TEST
 			if ( ((i == TEST_CUSUM) && testVector[TEST_CUSUM] ) ||
 				 ((i == TEST_NONPERIODIC) && testVector[TEST_NONPERIODIC] ) ||
 				 ((i == TEST_RND_EXCURSION) && testVector[TEST_RND_EXCURSION]) ||
-				 ((i == TEST_RND_EXCURSION_VAR) && testVector[TEST_RND_EXCURSION_VAR]) ||
+				 ((i == TEST_RND_EXCURSION_VAR) && testVector[TEST_RND_EXCURSION_VAR]) || 
 				 ((i == TEST_SERIAL) && testVector[TEST_SERIAL]) ) {
-
-				if ( (i == TEST_NONPERIODIC) && testVector[TEST_NONPERIODIC] )
+				
+				if ( (i == TEST_NONPERIODIC) && testVector[TEST_NONPERIODIC] )  
 					numOfFiles = MAXNUMOFTEMPLATES;
-				else if ( (i == TEST_RND_EXCURSION) && testVector[TEST_RND_EXCURSION] )
+				else if ( (i == TEST_RND_EXCURSION) && testVector[TEST_RND_EXCURSION] ) 
 					numOfFiles = 8;
-				else if ( (i == TEST_RND_EXCURSION_VAR) && testVector[TEST_RND_EXCURSION_VAR] )
+				else if ( (i == TEST_RND_EXCURSION_VAR) && testVector[TEST_RND_EXCURSION_VAR] ) 
 					numOfFiles = 18;
 				else
 					numOfFiles = 2;
 				for ( k=0; k<numOfFiles; k++ ) {
 					if ( k < 10 )
-						sprintf(s, "nist_results/%s/%s/%s/data%1d.txt", nistdir,generatorDir[option], testNames[i], k+1);
+						sprintf(s, "experiments/%s/%s/data%1d.txt", generatorDir[option], testNames[i], k+1);
 					else if ( k < 100 )
-						sprintf(s, "nist_results/%s/%s/%s/data%2d.txt", nistdir,generatorDir[option], testNames[i], k+1);
+						sprintf(s, "experiments/%s/%s/data%2d.txt", generatorDir[option], testNames[i], k+1);
 					else
-						sprintf(s, "nist_results/%s/%s/%s/data%3d.txt", nistdir,generatorDir[option], testNames[i], k+1);
-					if ( (i == TEST_RND_EXCURSION) || (i == TEST_RND_EXCURSION_VAR) )
+						sprintf(s, "experiments/%s/%s/data%3d.txt", generatorDir[option], testNames[i], k+1);
+					if ( (i == TEST_RND_EXCURSION) || (i == TEST_RND_EXCURSION_VAR) ) 
 						randomExcursionSampleSize = computeMetrics(s,i);
 					else
 						generalSampleSize = computeMetrics(s,i);
 				}
 			}
 			else {
-				sprintf(s, "nist_results/%s/%s/%s/results.txt", nistdir,generatorDir[option], testNames[i]);
+				sprintf(s, "experiments/%s/%s/results.txt", generatorDir[option], testNames[i]);
 				generalSampleSize = computeMetrics(s,i);
 			}
 		}
@@ -272,7 +244,7 @@ postProcessResults(int option)
 	fprintf(summary, "\n\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -\n");
 	case1 = 0;
 	case2 = 0;
-	if ( testVector[TEST_RND_EXCURSION] || testVector[TEST_RND_EXCURSION_VAR] )
+	if ( testVector[TEST_RND_EXCURSION] || testVector[TEST_RND_EXCURSION_VAR] ) 
 		case2 = 1;
 	for ( i=1; i<=NUMOFTESTS; i++ ) {
 		if ( testVector[i] && (i != TEST_RND_EXCURSION) && (i != TEST_RND_EXCURSION_VAR) ) {
@@ -315,23 +287,23 @@ computeMetrics(char *s, int test)
 	double	*A, *T, chi2, proportion, uniformity, p_hat, tmp;
 	float	c;
 	FILE	*fp;
-
+	
 	if ( (fp = fopen(s, "r")) == NULL ) {
 		printf("%s",s);
 		printf(" -- file not found. Exiting program.\n");
 		exit(-1);
 	}
-
+	
 	if ( (A = (double *)calloc(tp.numOfBitStreams, sizeof(double))) == NULL ) {
 		printf("Final Analysis Report aborted due to insufficient workspace\n");
 		return 0;
 	}
-
+	
 	/* Compute Metric 1: Proportion of Passing Sequences */
-
-	count = 0;
+	
+	count = 0; 		
 	sampleSize = tp.numOfBitStreams;
-
+	
 	if ( (test == TEST_RND_EXCURSION) || (test == TEST_RND_EXCURSION_VAR) ) { /* Special Case: Random Excursion Tests */
 		if ( (T = (double *)calloc(tp.numOfBitStreams, sizeof(double))) == NULL ) {
 			printf("Final Analysis Report aborted due to insufficient workspace\n");
@@ -342,15 +314,15 @@ computeMetrics(char *s, int test)
 			if ( c > 0.000000 )
 				T[count++] = c;
 		}
-
+		
 		if ( (A = (double *)calloc(count, sizeof(double))) == NULL ) {
 			printf("Final Analysis Report aborted due to insufficient workspace\n");
 			return 0;
 		}
-
+		
 		for ( j=0; j<count; j++ )
 			A[j] = T[j];
-
+		
 		sampleSize = count;
 		count = 0;
 		for ( j=0; j<sampleSize; j++ )
@@ -374,13 +346,13 @@ computeMetrics(char *s, int test)
 		passCount = 0;
 	else
 		passCount = sampleSize - count;
-
+	
 	p_hat = 1.0 - ALPHA;
 	proportion_threshold_max = (p_hat + 3.0 * sqrt((p_hat*ALPHA)/sampleSize)) * sampleSize;
 	proportion_threshold_min = (p_hat - 3.0 * sqrt((p_hat*ALPHA)/sampleSize)) * sampleSize;
-
+	
 	/* Compute Metric 2: Histogram */
-
+	
 	qsort((void *)A, sampleSize, sizeof(double), (void *)cmp);
 	for ( j=0; j<sampleSize; j++ ) {
 		pos = (int)floor(A[j]*10);
@@ -397,17 +369,17 @@ computeMetrics(char *s, int test)
 			chi2 += pow(freqPerBin[j]-expCount, 2)/expCount;
 		uniformity = cephes_igamc(9.0/2.0, chi2/2.0);
 	}
-
+	
 	for ( j=0; j<10; j++ )			/* DISPLAY RESULTS */
 		fprintf(summary, "%3d ", freqPerBin[j]);
-
+	
 	if ( expCount == 0 )
 		fprintf(summary, "    ----    ");
 	else if ( uniformity < 0.0001 )
 		fprintf(summary, " %8.6f * ", uniformity);
 	else
 		fprintf(summary, " %8.6f   ", uniformity);
-
+	
 	if ( sampleSize == 0 )
 		fprintf(summary, " ------     %s\n", testNames[test]);
 	//	else if ( proportion < 0.96 )
@@ -415,9 +387,9 @@ computeMetrics(char *s, int test)
 		fprintf(summary, "%4d/%-4d *  %s\n", passCount, sampleSize, testNames[test]);
 	else
 		fprintf(summary, "%4d/%-4d    %s\n", passCount, sampleSize, testNames[test]);
-
+	
 	fclose(fp);
 	free(A);
-
+	
 	return sampleSize;
 }

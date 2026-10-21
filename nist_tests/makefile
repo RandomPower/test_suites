@@ -1,6 +1,5 @@
 CC = /usr/bin/gcc
-GCCFLAGS = -c --std=c11 -g -fno-strict-aliasing  -Wall -O2 -fopenmp
-LDFLAGS = -fopenmp
+GCCFLAGS = -c -Wall
 ROOTDIR = .
 SRCDIR = $(ROOTDIR)/src
 OBJDIR = $(ROOTDIR)/obj
@@ -17,15 +16,12 @@ OBJ = $(OBJDIR)/assess.o $(OBJDIR)/frequency.o $(OBJDIR)/blockFrequency.o \
       $(OBJDIR)/utilities.o $(OBJDIR)/generators.o $(OBJDIR)/genutils.o
 
 assess: $(OBJ)
-	$(CC) -o $@ $(OBJ) -lm $(LDFLAGS)
+	$(CC) -o $@ $(OBJ) -lm
 
-$(OBJDIR):
-	mkdir -p $(OBJDIR)
+$(OBJDIR)/assess.o: $(SRCDIR)/assess.c defs.h decls.h utilities.h
+	$(CC) -o $@ -c $(SRCDIR)/assess.c
 
-$(OBJDIR)/assess.o: $(SRCDIR)/assess.c defs.h decls.h utilities.h | $(OBJDIR)
-	$(CC) -g -fno-strict-aliasing -o $@ -c $(SRCDIR)/assess.c
-
-$(OBJDIR)/frequency.o: $(SRCDIR)/frequency.c defs.h externs.h 
+$(OBJDIR)/frequency.o: $(SRCDIR)/frequency.c defs.h externs.h
 	$(CC) -o $@ $(GCCFLAGS) $(SRCDIR)/frequency.c
 
 $(OBJDIR)/blockFrequency.o: $(SRCDIR)/blockFrequency.c defs.h externs.h
