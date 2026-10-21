@@ -98,6 +98,8 @@ The "output_logs" folder contains the logs of each test suite (`runtests.log`, `
 and one IID log per binary file.
 
 The IID tests run up to 5 files at a time, splitting the cores among them (`IID_MAX_JOBS` and `IID_CORES`
-change these numbers); the NIST tests run one file per core (`NIST_CORES`, see `nist_tests/README.MD`).
+change these numbers); the NIST tests run one file per core (`NIST_CORES`, see `nist_tests/README.MD`), and so
+do the TestU01 Rabbit tests (`TESTU01_CORES`). When two runs share the server, give each one half of the cores,
+e.g. `NIST_CORES=32 IID_CORES=32 TESTU01_CORES=32 raptests`.
 
 Each $NISTFOLDER contains the results of a specific binary file.

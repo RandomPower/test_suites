@@ -33,4 +33,7 @@ main_workspace/
         └── filexx..
 ```
 Each "set_xx" folder is generated automatically based on the number of binary files to test (one set corresponds to 20 files).
+For each set, the 96 Crush tests run in parallel, then Alphabit. Then Rabbit runs on each file separately: one
+single-threaded process per file, at most one per core at a time (`TESTU01_CORES` overrides the number), and the
+program ends only when all of them have finished.
 The "rabbit_results" is generated automatically and will contain one .txt file for each binary file tested.

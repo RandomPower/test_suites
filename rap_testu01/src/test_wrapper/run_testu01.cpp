@@ -4,6 +4,7 @@
 #include <thread>
 #include <functional>
 #include <cstdio>
+#include <cstdlib>
 #include <iostream>
 
 extern "C"
@@ -137,6 +138,21 @@ void TestU01Wrapper::RunAlphabit(vector<FileStruct> *sets)
         ;
 }
 
+// Maximum number of Rabbit tests running at the same time. Each Rabbit test is a single-threaded process
+// working on one file, so by default one per core; TESTU01_CORES overrides it.
+static size_t rabbitMaxJobs()
+{
+    const char *env = getenv("TESTU01_CORES");
+    if (env != nullptr)
+    {
+        long n = strtol(env, nullptr, 10);
+        if (n > 0)
+            return static_cast<size_t>(n);
+    }
+    unsigned int cores = thread::hardware_concurrency();
+    return cores > 0 ? cores : 1;
+}
+
 void TestU01Wrapper::RunRabbit(vector<string> *bin_files)
 {
     string dir_name = "rabbit_results";
@@ -145,9 +161,22 @@ void TestU01Wrapper::RunRabbit(vector<string> *bin_files)
         fs::create_directory(dir_name);
     }
 
+    const size_t max_jobs = rabbitMaxJobs();
+    size_t running = 0;
+    int status = 0;
+
     for (size_t i = 0; i < bin_files->size(); i++)
     {
+        // At most max_jobs Rabbit tests at a time: wait for one to end before starting the next one
+        if (running >= max_jobs && wait(&status) > 0)
+            running--;
+
         pid_t pid = fork();
+        if (pid < 0)
+        {
+            perror("Rabbit: fork failed");
+            continue;
+        }
         if (pid == 0)
         {
             const string bin_file = (*bin_files)[i];
@@ -161,7 +190,7 @@ void TestU01Wrapper::RunRabbit(vector<string> *bin_files)
             ifstream in_file(bin_file, ios::binary | ios::ate);
             if (!in_file)
             {
-                cerr << "Alphabit: Error Opening concatenated file: " << bin_file << endl;
+                cerr << "Rabbit: Error Opening file: " << bin_file << endl;
                 exit(EXIT_FAILURE);
             }
             streamsize file_size = in_file.tellg();
@@ -177,13 +206,11 @@ void TestU01Wrapper::RunRabbit(vector<string> *bin_files)
             fclose(out);
             exit(0);
         }
-
-        // Add a limit of 20 processes at the time
-        if (i % 20 == 0 || i >= bin_files->size()) 
-        {
-            int status = 0;
-            while (wait(&status) > 0)
-                ;
-        }
+        running++;
     }
+
+    // Wait for all the Rabbit tests: the program must end only when every result has been written,
+    // because runtests.sh creates the report as soon as this process ends
+    while (wait(&status) > 0)
+        ;
 }
