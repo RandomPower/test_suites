@@ -1,0 +1,13 @@
+# Store text files with LF line endings and check them out with LF on every OS
+# (Windows included), so scripts and sources edited on Windows keep working
+# when they are copied to the Linux test server.
+* text=auto eol=lf
+
+# Binary files: never convert
+*.bin  binary
+*.dat  binary
+*.Z    binary
+*.pdf  binary
+*.xlsx binary
+nist_tests/data/data.bad_rng binary
+nist_tests/data/data.sha1    binary
