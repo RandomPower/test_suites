@@ -16,7 +16,9 @@ export PYTHON="${PYTHON:-python3}"
     exit 1
 }
 
-# External repositories pinned as git submodules (IID_validation)
+# External repositories pinned as git submodules (IID_validation). sync applies URL changes
+# made in .gitmodules to an existing clone.
+git submodule sync --recursive
 git submodule update --init --recursive
 
 # Compile the nist test suite

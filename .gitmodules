@@ -1,3 +1,3 @@
 [submodule "external/IID_validation"]
 	path = external/IID_validation
-	url = https://github.com/RandomPower/IID_validation.git
+	url = ../IID_validation.git
