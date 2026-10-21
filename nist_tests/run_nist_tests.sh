@@ -38,20 +38,23 @@ if [ "$THREADS" -lt 1 ]; then THREADS=1; fi
 export OMP_NUM_THREADS=$THREADS
 echo "NIST: $NFILES files, $MAX_JOBS in parallel, $OMP_NUM_THREADS OpenMP threads each"
 
+# A failed file does not stop the others: its name is written to nist_failed.txt and
+# the script exits with an error at the end
+mkdir -p nist_results
+FAILED="$CUR_DIR/nist_results/nist_failed.txt"
+rm -f "$FAILED"
+
 for i in "${FILES[@]}"; do
     export NISTFOLDER="$(basename "${i%.bin}")"
     create_dir_script
 
     {
-        # Run assess, fix its buggy exit code. "|| ec=$?" is needed because
-        # set -e is inherited here and would exit before checking the code.
+        # Run assess. It returns 1 (wrongly) on success, so only codes other than 0 and 1
+        # are failures. "|| ec=$?" is needed because set -e is inherited here.
         ec=0
         "$NIST_ASSESS_DIR/assess" 1000000 -i "$i" -f 1 -n 2000 || ec=$?
-        # Treat exit code 1 (wrongly used for success) as success
-        if [ $ec -eq 1 ]; then
-            exit 0
-        else
-            exit $ec
+        if [ $ec -ne 0 ] && [ $ec -ne 1 ]; then
+            echo "$NISTFOLDER (exit code $ec)" >> "$FAILED"
         fi
     } > "nist_results/${NISTFOLDER}/log.txt" 2>&1 &
 
@@ -61,18 +64,13 @@ for i in "${FILES[@]}"; do
     done
 done
 
-# Wait for all remaining jobs (without aborting)
-set +e
-status=0
-for job in $(jobs -p); do
-    if ! wait "$job"; then
-        echo "Job $job exited with error code $?" >&2
-        status=1
-    fi
-done
-set -e
+# Wait for all remaining jobs
+wait
 
 rm -rf ./templates
 
-exit "$status"
+if [ -s "$FAILED" ]; then
+    echo "NIST failed for: $(tr '\n' ' ' < "$FAILED")(see log.txt in nist_results/<file>/)" >&2
+    exit 1
+fi
 
