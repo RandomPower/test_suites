@@ -40,12 +40,15 @@ The generated executables will be moved into /usr/local/bin/test_lib/ and will h
 Set the workspace to be the folder where you want the results to be generated.
 There must be a folder called "binaries" or "bins" containing the binaries in the workspace.
 
-To run the tests, run the following command:
+To run the tests, run the following command from the workspace:
 
 ```
-nohup /usr/local/bin/test_lib/runtests.sh &
+raptests
 ```
-As the tests will take a lot of time, this will ensure that they are ran in background.
+As the tests will take a lot of time, they are started in the background (with nohup) and keep running after
+you log out. Progress is logged in `output_logs/` (`tail -f output_logs/runtests.log`) and the Excel report is
+written to the workspace at the end. `raptests -f` runs the tests in the foreground instead, `raptests -h`
+shows the help. Starting `raptests` again in a folder where the tests are still running is refused.
 
 The structure of the folders, at the end of the tests, will be as follows:
 

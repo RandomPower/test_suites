@@ -1,0 +1,64 @@
+#!/bin/bash
+# raptests: runs the randomness test suites (NIST STS, TestU01, IID validation)
+# on the .bin files in ./binaries (or ./bins) and creates the Excel report.
+#
+# Run it from the folder that contains binaries/. By default the tests start in
+# the background (they take hours) and keep running after you log out; logs are
+# written to output_logs/ and the report to this folder at the end.
+#
+# Usage: raptests       start the tests in the background
+#        raptests -f    run in the foreground and wait until the end
+#        raptests -h    show this help
+set -euo pipefail
+
+TEST_LIB=$(dirname "$(readlink -f "$0")")
+LOG_DIR="$PWD/output_logs"
+PID_FILE="$LOG_DIR/raptests.pid"
+
+usage() { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; }
+
+FOREGROUND=0
+case "${1:-}" in
+    "") ;;
+    -f|--foreground) FOREGROUND=1 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "raptests: unknown option '$1'" >&2; usage >&2; exit 2 ;;
+esac
+
+# Check the input folder
+if [ -d binaries ]; then
+    BIN_DIR=binaries
+elif [ -d bins ]; then
+    BIN_DIR=bins
+else
+    echo "raptests: no 'binaries' or 'bins' folder in $PWD" >&2
+    exit 1
+fi
+shopt -s nullglob
+FILES=( "$BIN_DIR"/*.bin )
+if [ ${#FILES[@]} -eq 0 ]; then
+    echo "raptests: no .bin files in $PWD/$BIN_DIR" >&2
+    exit 1
+fi
+
+# Refuse to start twice in the same folder
+if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+    echo "raptests: tests already running in this folder (PID $(cat "$PID_FILE"))" >&2
+    exit 1
+fi
+
+mkdir -p "$LOG_DIR"
+echo "raptests: ${#FILES[@]} files in $BIN_DIR/"
+
+if [ "$FOREGROUND" -eq 1 ]; then
+    echo $$ > "$PID_FILE"
+    trap 'rm -f "$PID_FILE"' EXIT
+    "$TEST_LIB/runtests.sh"
+else
+    # the PID file is removed when runtests.sh ends
+    nohup bash -c 'echo $$ > "$2"; "$1"; ec=$?; rm -f "$2"; exit $ec' raptests "$TEST_LIB/runtests.sh" "$PID_FILE" \
+        > "$LOG_DIR/raptests.out" 2>&1 < /dev/null &
+    echo "raptests: tests started in the background (PID $!)"
+    echo "  progress: tail -f output_logs/runtests.log"
+    echo "  the Excel report is written to this folder when all the tests are done"
+fi

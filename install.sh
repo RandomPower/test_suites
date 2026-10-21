@@ -30,11 +30,14 @@ cp report_generator/dist/report_generator test_lib/
 cp rap_testu01/build/src/rap_testu01 test_lib/testu01
 
 # Give run permissions to the scripts
-chmod +x test_lib/runtests.sh test_lib/run_iid.sh
+chmod +x test_lib/runtests.sh test_lib/run_iid.sh test_lib/raptests
 
 # rsync -a run with sudo keeps the owner of test_lib (the current user),
 # so the steps below do not need sudo
 sudo rsync -avz test_lib /usr/local/bin/.
+
+# 'raptests' command, available from any folder
+sudo ln -sf "$INSTALL_DIR/raptests" /usr/local/bin/raptests
 
 # Install the IID procedure, at the version pinned by the external/IID_validation submodule
 rsync -a --delete --exclude .git --exclude .venv external/IID_validation/ "$INSTALL_DIR/IID_validation/"
