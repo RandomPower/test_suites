@@ -6,12 +6,15 @@ Repo containing an automatic procedure to run the NIST test suite and TestU01 wi
   (non-interactive command line, OpenMP, faster counting with byte-identical output). See `nist_tests/README.MD`.
 - `rap_testu01/`: our TestU01 runner. TestU01 1.2.3 itself is downloaded by CMake at a fixed upstream commit.
 - `external/IID_validation`: git submodule with the IID validation procedure (NIST SP 800-90B permutation tests),
-  pinned to a fixed version.
+  pinned to a fixed version. The tests run with its compiled Rust backend.
 - `report_generator/`: builds the final Excel report.
 
 ## Installation
-Requirements: gcc, make, cmake >= 3.22, git, rsync, python3 with venv, and access to github.com
+Requirements: gcc, make, cmake >= 3.22, git, rsync, Python >= 3.11 with venv, and access to github.com
 (TestU01 and the IID_validation submodule are downloaded during the installation).
+The Rust core of IID_validation is compiled during the installation: if Rust is not installed, a temporary
+toolchain is downloaded automatically (internet access needed). If `python3` is older than 3.11, choose another
+interpreter with `PYTHON=python3.11 ./install.sh`.
 
 Navigate with the terminal into the test_suites directory and run the following commands to automatically compile the NIST and TestU01 libraries and to move them in /usr/local/bin/
 
@@ -91,6 +94,10 @@ Each "set_n" folder is generated automatically based on the number of binary fil
 The "rabbit_results" is generated automatically and will contain one .txt file for each binary file tested.
 
 The report excel will be generated automatically at the end of the tests.
-The "output_logs" folder contains the logs of each test suite (`runtests.log`, `nist.log`, `testu01.log`, `iid.log`).
+The "output_logs" folder contains the logs of each test suite (`runtests.log`, `nist.log`, `testu01.log`, `iid.log`)
+and one IID log per binary file.
+
+The IID tests run up to 5 files at a time, splitting the cores among them (`IID_MAX_JOBS` and `IID_CORES`
+change these numbers); the NIST tests run one file per core (`NIST_CORES`, see `nist_tests/README.MD`).
 
 Each $NISTFOLDER contains the results of a specific binary file.

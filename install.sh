@@ -7,6 +7,15 @@ cd "$(dirname "$0")"
 
 INSTALL_DIR=/usr/local/bin/test_lib
 
+# IID_validation needs Python >= 3.11: check it now rather than after the long builds.
+# If python3 is older, choose another interpreter with: PYTHON=python3.11 ./install.sh
+export PYTHON="${PYTHON:-python3}"
+"$PYTHON" -c 'import sys; sys.exit(sys.version_info < (3, 11))' || {
+    echo "Error: IID_validation needs Python >= 3.11, found $("$PYTHON" --version 2>&1)." >&2
+    echo "Install it (e.g. sudo apt install python3.11 python3.11-venv) and run: PYTHON=python3.11 ./install.sh" >&2
+    exit 1
+}
+
 # External repositories pinned as git submodules (IID_validation)
 git submodule update --init --recursive
 
@@ -39,9 +48,9 @@ sudo rsync -avz test_lib /usr/local/bin/.
 # 'raptests' command, available from any folder
 sudo ln -sf "$INSTALL_DIR/raptests" /usr/local/bin/raptests
 
-# Install the IID procedure, at the version pinned by the external/IID_validation submodule
-rsync -a --delete --exclude .git --exclude .venv external/IID_validation/ "$INSTALL_DIR/IID_validation/"
-cd "$INSTALL_DIR/IID_validation"
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-.venv/bin/pip install .
+# Install the IID procedure, at the version pinned by the external/IID_validation submodule, with its own
+# installer: virtual environment in IID_validation/.venv and compiled Rust core (if Rust is not installed,
+# the build downloads a temporary toolchain). rust/target is kept to speed up the next builds.
+rsync -a --delete --exclude .git --exclude .venv --exclude /rust/target/ \
+    external/IID_validation/ "$INSTALL_DIR/IID_validation/"
+"$INSTALL_DIR/IID_validation/install.sh"
