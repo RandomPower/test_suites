@@ -1,7 +1,18 @@
 # NIST and TestU01 Libraries
 Repo containing an automatic procedure to run the NIST test suite and TestU01 with creation of a final analysis Excel report
 
+## Components and versions
+- `nist_tests/`: NIST STS 2.1.2, imported unchanged in the commit tagged `nist-sts-2.1.2`, plus our changes
+  (non-interactive command line, OpenMP, faster counting with byte-identical output). See `nist_tests/README.MD`.
+- `rap_testu01/`: our TestU01 runner. TestU01 1.2.3 itself is downloaded by CMake at a fixed upstream commit.
+- `external/IID_validation`: git submodule with the IID validation procedure (NIST SP 800-90B permutation tests),
+  pinned to a fixed version.
+- `report_generator/`: builds the final Excel report.
+
 ## Installation
+Requirements: gcc, make, cmake >= 3.22, git, rsync, python3 with venv, and access to github.com
+(TestU01 and the IID_validation submodule are downloaded during the installation).
+
 Navigate with the terminal into the test_suites directory and run the following commands to automatically compile the NIST and TestU01 libraries and to move them in /usr/local/bin/
 Admin powers will be required for this last operation.
 
@@ -16,10 +27,13 @@ The generated executables will be moved into /usr/local/bin/test_lib/ and will h
 /usr/local/bin/test_lib
     ├── nist/
     │   ├── assess
-    │   ├── run_nist_tests.sh/
+    │   ├── run_nist_tests.sh
     │   └── templates/
+    ├── IID_validation/
     ├── testu01
-    └── report_generator
+    ├── report_generator
+    ├── run_iid.sh
+    └── runtests.sh
 ```
 
 ## Running the tests

@@ -9,3 +9,8 @@ report_generator/.venv/
 report_generator/build/
 report_generator/dist/
 report_generator/report_generator.spec
+
+# Build outputs copied into test_lib by install.sh
+test_lib/nist/
+test_lib/testu01
+test_lib/report_generator
