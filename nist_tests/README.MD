@@ -35,45 +35,57 @@ Run it after any change to the code in this folder.
 
 ## Build and installation
 
-Run the make command to generate the assess executable. 
+`install.sh` (in the repository root) builds and installs everything. To build only `assess`:
+
 ```
 make
 ```
 
-The ./assess and ./run_nist_tests.sh scripts and the ./templates folder must be placed in a generic directory where anybody can have access to run the NIST tests.
-The NIST_ASSESS_DIR variable in the run_nist_tests.sh script must be set to the directory where the assess script is located.
-For example, in /usr/local/bin/, the structure will look as follows:
+`install.sh` copies `assess`, `run_nist_tests.sh` and the `templates` folder to:
 
 ```
-/usr/local/bin/
+/usr/local/bin/test_lib/
     └── nist/
         ├── assess
-        ├── run_nist_tests.sh/
+        ├── run_nist_tests.sh
         └── templates/
 ```
 
-The assess and run_nist_tests scripts must be executable. You can do this by running the following command:
+`run_nist_tests.sh` looks for `assess` and `templates` in `/usr/local/bin/test_lib/nist`; set the
+environment variable `NIST_ASSESS_DIR` to use another folder.
 
-```
-chmod +x assess
-chmod +x run_nist_tests.sh
-```
+## Running
 
-Set the workspace to be the folder where you want the results to be generated.
-There must be a folder called "binaries" or "bins" containing the binaries in the workspace.
+The NIST tests are normally started together with the other suites by `raptests` (see the main README).
+To run only the NIST tests, run `run_nist_tests.sh` from the workspace, the folder that contains a
+"binaries" or "bins" folder with the `.bin` files.
+
+Each `.bin` file is tested with `assess 1000000 -i <file> -f 1 -n 2000`: 2000 streams of 10^6 bits,
+so every file must contain at least 2*10^9 bits (250 MB).
+
+Parallelism: one `assess` runs per `.bin` file, at most one per core. When there are fewer files than
+cores, the spare cores go to OpenMP, which runs the 15 tests of each stream in parallel (at most 15
+threads per file). On a 64-core server, 64 or more files run single-threaded, 64 at a time, while
+8 files get 8 threads each. Set `NIST_CORES` to use fewer cores, e.g. when the server is shared.
 
 The structure of the folders is as follows:
 
 ```
-main_worskpace/
+main_workspace/
     ├── binaries/
-    │   ├── binary1
-    │   └── binary2
+    │   ├── binary1.bin
+    │   └── binary2.bin
     └── nist_results/
         └── $NISTFOLDER/
-            ├── etc/
-            └── etc2/
+            ├── log.txt
+            └── AlgorithmTesting/
+                ├── finalAnalysisReport.txt
+                ├── freq.txt
+                ├── Frequency/
+                ├── ...
+                └── RandomExcursionsVariant/
 ```
 
 The folder "nist_results" is generated automatically by the script.
-Each $NISTFOLDER contains the results of a specific binary file.
+Each $NISTFOLDER is named after a binary file and contains its results: one folder per test, with
+`stats.txt` and `results.txt` (the p-values), and the summary in `finalAnalysisReport.txt`.

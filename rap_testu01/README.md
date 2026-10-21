@@ -10,20 +10,9 @@ cmake >= 3.22 and access to github.com during the build. See the comments in
 `CMakeLists.txt` for the build options that make TestU01 compile with recent
 compilers (GCC 15) and autotools.
 
-The ./rap_testu01 executable must be placed in a generic directory where anybody can have access to run the tests.
-For example, in /usr/local/bin/, the structure will look as follows:
-
-```
-/usr/local/bin/
-    └── testu01/
-        └── rap_testu01
-```
-
-The rap_testu01 must have execution rights. You can do this by running the following command:
-
-```
-chmod +x rap_testu01
-```
+The executable is created in `build/src/rap_testu01`. `install.sh` (in the repository root) builds it and
+installs it as `/usr/local/bin/test_lib/testu01`. TestU01 is linked statically, so the executable does not
+depend on any file left in the build folder.
 
 Set the workspace to be the folder where you want the results to be generated.
 There must be a folder called "binaries" or "bins" containing the binaries in the workspace.
@@ -31,7 +20,7 @@ There must be a folder called "binaries" or "bins" containing the binaries in th
 The structure of the folders is as follows:
 
 ```
-main_worskpace/
+main_workspace/
     ├── binaries/
     │   ├── binary1
     │   └── binary2

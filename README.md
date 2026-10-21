@@ -14,11 +14,19 @@ Requirements: gcc, make, cmake >= 3.22, git, rsync, python3 with venv, and acces
 (TestU01 and the IID_validation submodule are downloaded during the installation).
 
 Navigate with the terminal into the test_suites directory and run the following commands to automatically compile the NIST and TestU01 libraries and to move them in /usr/local/bin/
-Admin powers will be required for this last operation.
 
 ```
-chmod +x install.sh
+git submodule update --init
 ./install.sh
+```
+
+Run `install.sh` as your normal user, **not** with `sudo`: it asks for the password only when it copies the
+files into /usr/local/bin. Running it again is safe (TestU01 is not downloaded again).
+If an older installation was run with `sudo`, it may have left files owned by root that `install.sh` cannot
+overwrite ("Permission denied"). Give them back to your user first:
+
+```
+sudo chown -R $USER:$USER test_lib /usr/local/bin/test_lib
 ```
 
 The generated executables will be moved into /usr/local/bin/test_lib/ and will have the following structure:
@@ -32,9 +40,13 @@ The generated executables will be moved into /usr/local/bin/test_lib/ and will h
     ├── IID_validation/
     ├── testu01
     ├── report_generator
+    ├── raptests
     ├── run_iid.sh
     └── runtests.sh
 ```
+
+`install.sh` also creates the link `/usr/local/bin/raptests -> /usr/local/bin/test_lib/raptests`, so the
+`raptests` command is available from any folder.
 
 ## Running the tests
 Set the workspace to be the folder where you want the results to be generated.
@@ -53,7 +65,7 @@ shows the help. Starting `raptests` again in a folder where the tests are still 
 The structure of the folders, at the end of the tests, will be as follows:
 
 ```
-main_worskpace/
+main_workspace/
     ├── binaries/ (or bins/)
     │   ├── binary1
     │   └── binary2
@@ -68,13 +80,17 @@ main_worskpace/
     │   ├── file1.txt
     │   ├── file2.txt
     │   └── filexx..
+    ├── output_logs/
+    │   ├── runtests.log
+    │   └── ...
     └── report.xlsx
 ```
 
 The folder "nist_results" is generated automatically by the script.
-Each "set_n" folder is generated automatically based on the number of binary files to test (one set corresponds to 20 files), and will contain 96 crsuh test .txt files (one for each test) and an alphabit-results.txt.
+Each "set_n" folder is generated automatically based on the number of binary files to test (one set corresponds to 20 files), and will contain 96 crush test .txt files (one for each test) and an alphabit-results.txt.
 The "rabbit_results" is generated automatically and will contain one .txt file for each binary file tested.
 
 The report excel will be generated automatically at the end of the tests.
+The "output_logs" folder contains the logs of each test suite (`runtests.log`, `nist.log`, `testu01.log`, `iid.log`).
 
 Each $NISTFOLDER contains the results of a specific binary file.
