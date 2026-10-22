@@ -61,9 +61,11 @@ To run the tests, run the following command from the workspace:
 raptests
 ```
 As the tests will take a lot of time, they are started in the background (with nohup) and keep running after
-you log out. Progress is logged in `output_logs/` (`tail -f output_logs/runtests.log`) and the Excel report is
-written to the workspace at the end. `raptests -f` runs the tests in the foreground instead, `raptests -h`
-shows the help. Starting `raptests` again in a folder where the tests are still running is refused.
+you log out. The tests do not use the graphical display, so the SSH session can be closed at any time, also with
+X11 forwarding enabled (e.g. in MobaXterm). Progress is logged in `output_logs/`
+(`tail -f output_logs/runtests.log`) and the Excel report is written to the workspace at the end. `raptests -f`
+runs the tests in the foreground instead, `raptests -h` shows the help. Starting `raptests` again in a folder
+where the tests are still running is refused.
 
 The structure of the folders, at the end of the tests, will be as follows:
 

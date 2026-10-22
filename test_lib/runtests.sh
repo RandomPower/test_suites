@@ -1,6 +1,14 @@
 #!/bin/bash
 set -euo pipefail
 
+# The tests never use a graphical display. When they are started from an SSH session with X11 forwarding
+# (e.g. MobaXterm), the programs would inherit its DISPLAY: IID_validation would then draw its plots with
+# matplotlib through the X server of the client, and would be killed ("X connection to localhost:10.0
+# broken") if the session is closed while the tests run. Remove the display and use the non-interactive
+# matplotlib backend, so the session can be closed at any time.
+unset DISPLAY WAYLAND_DISPLAY
+export MPLBACKEND=Agg
+
 CUR_DIR=$(pwd)
 OUTPUT_DIR="$CUR_DIR/output_logs"
 mkdir -p "$OUTPUT_DIR"
