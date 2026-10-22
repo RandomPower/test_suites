@@ -1,47 +1,58 @@
+#!/bin/bash
+# Builds the NIST STS, the TestU01 runner and the report generator and installs
+# them, together with the IID validation procedure, in /usr/local/bin/test_lib.
+# Admin rights (sudo) are needed to copy the files into /usr/local/bin.
+set -euo pipefail
+cd "$(dirname "$0")"
+
+INSTALL_DIR=/usr/local/bin/test_lib
+
+# IID_validation needs Python >= 3.11: check it now rather than after the long builds.
+# If python3 is older, choose another interpreter with: PYTHON=python3.11 ./install.sh
+export PYTHON="${PYTHON:-python3}"
+"$PYTHON" -c 'import sys; sys.exit(sys.version_info < (3, 11))' || {
+    echo "Error: IID_validation needs Python >= 3.11, found $("$PYTHON" --version 2>&1)." >&2
+    echo "Install it (e.g. sudo apt install python3.11 python3.11-venv) and run: PYTHON=python3.11 ./install.sh" >&2
+    exit 1
+}
+
+# External repositories pinned as git submodules (IID_validation). sync applies URL changes
+# made in .gitmodules to an existing clone.
+git submodule sync --recursive
+git submodule update --init --recursive
+
 # Compile the nist test suite
-cd nist_tests
-make
-chmod +x assess
-chmod +x run_nist_tests.sh
-cd ..
+make -C nist_tests
+chmod +x nist_tests/assess nist_tests/run_nist_tests.sh
 
 # Copy the files in final executable folder
-cp ./nist_tests/assess ./test_lib/nist/
-cp ./nist_tests/run_nist_tests.sh ./test_lib/nist/
-rsync -avz ./nist_tests/templates ./test_lib/nist/
+mkdir -p test_lib/nist
+cp nist_tests/assess nist_tests/run_nist_tests.sh test_lib/nist/
+rsync -a nist_tests/templates test_lib/nist/
 
-# Compile the TestU01 library and test runner
-cd rap_testu01
-chmod +x builder.sh
-./builder.sh
-chmod +x ./build/src/rap_testu01 
-cd ..
+# Compile the TestU01 library and test runner (TestU01 is downloaded and built by CMake)
+rap_testu01/builder.sh
 
 # Set environment and create report generator
-cd report_generator
-chmod +x build.sh
-./build.sh
-cd ..
-
-cp ./report_generator/dist/report_generator ./test_lib
+(cd report_generator && chmod +x build.sh && ./build.sh)
+cp report_generator/dist/report_generator test_lib/
 
 # Copy the TestU01 runner in the new folder
-cp ./rap_testu01/build/src/rap_testu01 ./test_lib/testu01
+cp rap_testu01/build/src/rap_testu01 test_lib/testu01
 
 # Give run permissions to the scripts
-chmod +x ./test_lib/runtests.sh
+chmod +x test_lib/runtests.sh test_lib/run_iid.sh test_lib/raptests
 
+# rsync -a run with sudo keeps the owner of test_lib (the current user),
+# so the steps below do not need sudo
 sudo rsync -avz test_lib /usr/local/bin/.
 
-# Install the IID procedure
-cd /usr/local/bin/test_lib
+# 'raptests' command, available from any folder
+sudo ln -sf "$INSTALL_DIR/raptests" /usr/local/bin/raptests
 
-chmod +x run_iid.sh
-git clone https://github.com/RandomPower/IID_validation.git
-
-cd IID_validation
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-pip install .
-deactivate
+# Install the IID procedure, at the version pinned by the external/IID_validation submodule, with its own
+# installer: virtual environment in IID_validation/.venv and compiled Rust core (if Rust is not installed,
+# the build downloads a temporary toolchain). rust/target is kept to speed up the next builds.
+rsync -a --delete --exclude .git --exclude .venv --exclude /rust/target/ \
+    external/IID_validation/ "$INSTALL_DIR/IID_validation/"
+"$INSTALL_DIR/IID_validation/install.sh"

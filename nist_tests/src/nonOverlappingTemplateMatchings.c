@@ -27,6 +27,7 @@ NonOverlappingTemplateMatchings(int m, int n)
 	int				i, j, jj, k, match, SKIP, M, N, K = 5;
 	char			directory[100];
 	BitSequence		*sequence = NULL;
+	unsigned int	*rpWin = NULL, rpTv, rpW, rpMask;   /* [RaP] */
 
 	N = 8;
 	M = n/N;
@@ -79,6 +80,21 @@ NonOverlappingTemplateMatchings(int m, int n)
 		}
 		pi[K] = 1 - sum;
 
+		/* [RaP] integer value of the m-bit window starting at each position j:
+		   the template is still compared position by position, but as one integer */
+		rpMask = (m >= 32) ? 0xFFFFFFFFu : ((1u << m) - 1);
+		if ( (rpWin = (unsigned int *) malloc((size_t)n * sizeof(unsigned int))) == NULL ) {
+			fprintf(stats[TEST_NONPERIODIC], "\tInsufficient memory for required work space.\n");
+			free(sequence); free(Wj); fclose(fp);
+			return;
+		}
+		rpW = 0;
+		for ( j=0; j<n; j++ ) {
+			rpW = ((rpW << 1) | epsilon[j]) & rpMask;
+			if ( j >= m-1 )
+				rpWin[j-m+1] = rpW;
+		}
+
 		for( jj=0; jj<MIN(MAXNUMOFTEMPLATES, numOfTemplates[m]); jj++ ) {
 			sum = 0;
 
@@ -88,18 +104,15 @@ NonOverlappingTemplateMatchings(int m, int n)
 				fprintf(stats[TEST_NONPERIODIC], "%d", sequence[k]);
 			}
 			fprintf(stats[TEST_NONPERIODIC], " ");
+			rpTv = 0;                                   /* [RaP] template as an integer */
+			for ( k=0; k<m; k++ )
+				rpTv = (rpTv << 1) | sequence[k];
 			for ( k=0; k<=K; k++ )
 				nu[k] = 0;
 			for ( i=0; i<N; i++ ) {
 				W_obs = 0;
 				for ( j=0; j<M-m+1; j++ ) {
-					match = 1;
-					for ( k=0; k<m; k++ ) {
-						if ( (int)sequence[k] != (int)epsilon[i*M+j+k] ) {
-							match = 0;
-							break;
-						}
-					}
+					match = (rpWin[i*M+j] == rpTv);       /* [RaP] same comparison, on integers */
 					if ( match == 1 ) {
 						W_obs++;
                         j += m-1;
@@ -133,6 +146,7 @@ NonOverlappingTemplateMatchings(int m, int n)
 		free(sequence);
 
 	free(Wj);
+	free(rpWin);
     if ( fp != NULL )
         fclose(fp);
 }

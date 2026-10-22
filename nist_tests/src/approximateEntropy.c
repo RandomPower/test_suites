@@ -40,14 +40,15 @@ ApproximateEntropy(int m, int n)
 			}
 			for ( i=1; i<powLen-1; i++ )
 				P[i] = 0;
-			for ( i=0; i<numOfBlocks; i++ ) { /* COMPUTE FREQUENCY */
-				k = 1;
-				for ( j=0; j<blockSize; j++ ) {
-					k <<= 1;
-					if ( (int)epsilon[(i+j) % seqLength] == 1 )
-						k++;
+			{	/* [RaP] COMPUTE FREQUENCY: same index k-1 = 2^blockSize-1+pattern, with a sliding window */
+				unsigned int w = 0, mask = (1u << blockSize) - 1;
+				for ( j=0; j<blockSize; j++ )
+					w = (w << 1) | epsilon[j % seqLength];
+				for ( i=0; i<numOfBlocks; i++ ) {
+					P[mask + w]++;
+					w = ((w << 1) | epsilon[(i+blockSize) % seqLength]) & mask;
 				}
-				P[k-1]++;
+				k = 0;
 			}
 			/* DISPLAY FREQUENCY */
 			sum = 0.0;

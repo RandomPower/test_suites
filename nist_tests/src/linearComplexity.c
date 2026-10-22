@@ -4,6 +4,56 @@
 #include <string.h>
 #include "../include/externs.h"
 #include "../include/cephes.h"  
+#include <stdint.h>
+
+/* [RaP] Berlekamp-Massey on 64-bit words.
+   Same algorithm and same update conditions as the original NIST loop (C, B, L, m, N),
+   with the polynomials stored as packed bit vectors: it returns the same integer L. */
+static uint64_t
+rp_get64(const uint64_t *a, int pos)
+{
+	int w = pos >> 6, b = pos & 63;
+	return b ? (a[w] >> b) | (a[w+1] << (64-b)) : a[w];
+}
+
+static int
+rp_linear_complexity(const BitSequence *s, int M, uint64_t *C, uint64_t *B, uint64_t *T, uint64_t *R, int W)
+{
+	int i, k, N_, L = 0, m = -1, shift, ws, bs;
+	uint64_t d, cw, v;
+
+	memset(C, 0, W*sizeof(uint64_t)); memset(B, 0, W*sizeof(uint64_t)); memset(R, 0, (W+1)*sizeof(uint64_t));
+	C[0] = 1; B[0] = 1;
+	for ( k=0; k<M; k++ )                       /* R = reversed sequence: bit k = s[M-1-k] */
+		if ( s[M-1-k] )
+			R[k>>6] |= (uint64_t)1 << (k&63);
+	for ( N_=0; N_<M; N_++ ) {
+		/* d = s[N] + sum_{i=1..L} C[i]*s[N-i]  (mod 2);  s[N-i] = R[M-1-N+i] */
+		d = 0;
+		for ( i=0; i<=(L>>6); i++ ) {
+			cw = C[i];
+			if ( i == (L>>6) && (L&63) != 63 )
+				cw &= ((uint64_t)1 << ((L&63)+1)) - 1;
+			d ^= cw & rp_get64(R, M-1-N_ + 64*i);
+		}
+		if ( __builtin_parityll(d) ) {
+			memcpy(T, C, W*sizeof(uint64_t));
+			shift = N_ - m; ws = shift >> 6; bs = shift & 63;   /* C = C + x^(N-m) * B */
+			for ( i=W-1; i>=ws; i-- ) {
+				v = B[i-ws] << bs;
+				if ( bs && i-ws-1 >= 0 )
+					v |= B[i-ws-1] >> (64-bs);
+				C[i] ^= v;
+			}
+			if ( L <= N_/2 ) {
+				L = N_ + 1 - L;
+				m = N_;
+				memcpy(B, T, W*sizeof(uint64_t));
+			}
+		}
+	}
+	return L;
+}
 
 void
 LinearComplexity(int M, int n)
@@ -14,6 +64,8 @@ LinearComplexity(int M, int n)
 	BitSequence  *T = NULL, *P = NULL, *B_ = NULL, *C = NULL;
 	
 	N = (int)floor(n/M);
+	int       rpW = (M + 63)/64 + 1;
+	uint64_t  *rpC = calloc(rpW, 8), *rpB = calloc(rpW, 8), *rpT = calloc(rpW, 8), *rpR = calloc(rpW+1, 8);
 	if ( ((B_ = (BitSequence *) calloc(M, sizeof(BitSequence))) == NULL) ||
 		 ((C  = (BitSequence *) calloc(M, sizeof(BitSequence))) == NULL) ||
 		 ((P  = (BitSequence *) calloc(M, sizeof(BitSequence))) == NULL) ||
@@ -46,44 +98,8 @@ LinearComplexity(int M, int n)
 	for ( i=0; i<K+1; i++ )
 		nu[i] = 0.00;
 	for ( ii=0; ii<N; ii++ ) {
-		for ( i=0; i<M; i++ ) {
-			B_[i] = 0;
-			C[i] = 0;
-			T[i] = 0;
-			P[i] = 0;
-		}
-		L = 0;
-		m = -1;
-		d = 0;
-		C[0] = 1;
-		B_[0] = 1;
-		
-		/* DETERMINE LINEAR COMPLEXITY */
-		N_ = 0;
-		while ( N_ < M ) {
-			d = (int)epsilon[ii*M+N_];
-			for ( i=1; i<=L; i++ )
-				d += C[i] * epsilon[ii*M+N_-i];
-			d = d%2;
-			if ( d == 1 ) {
-				for ( i=0; i<M; i++ ) {
-					T[i] = C[i];
-					P[i] = 0;
-				}
-				for ( j=0; j<M; j++ )
-					if ( B_[j] == 1 )
-						P[j+N_-m] = 1;
-				for ( i=0; i<M; i++ )
-					C[i] = (C[i] + P[i])%2;
-				if ( L <= N_/2 ) {
-					L = N_ + 1 - L;
-					m = N_;
-					for ( i=0; i<M; i++ )
-						B_[i] = T[i];
-				}
-			}
-			N_++;
-		}
+		/* [RaP] same L as the original Berlekamp-Massey loop, computed on 64-bit words */
+		L = rp_linear_complexity(&epsilon[ii*M], M, rpC, rpB, rpT, rpR, rpW);
 		if ( (parity = (M+1)%2) == 0 ) 
 			sign = -1;
 		else 
@@ -124,4 +140,5 @@ LinearComplexity(int M, int n)
 	free(P);
 	free(C);
 	free(T);
+	free(rpC); free(rpB); free(rpT); free(rpR);
 }

@@ -3,20 +3,16 @@ Run builder.sh to compile the TestU01 library and to link it with the test runne
 ./builder.sh
 ```
 
-The ./rap_testu01 executable must be placed in a generic directory where anybody can have access to run the tests.
-For example, in /usr/local/bin/, the structure will look as follows:
+TestU01 is not stored in this repository: CMake downloads the official TestU01 1.2.3
+sources (https://github.com/umontreal-simul/TestU01-2009, fixed commit `a038a86`) and
+builds them as static libraries inside `build/`. Requirements: git, make,
+cmake >= 3.22 and access to github.com during the build. See the comments in
+`CMakeLists.txt` for the build options that make TestU01 compile with recent
+compilers (GCC 15) and autotools.
 
-```
-/usr/local/bin/
-    └── testu01/
-        └── rap_testu01
-```
-
-The rap_testu01 must have execution rights. You can do this by running the following command:
-
-```
-chmod +x rap_testu01
-```
+The executable is created in `build/src/rap_testu01`. `install.sh` (in the repository root) builds it and
+installs it as `/usr/local/bin/test_lib/testu01`. TestU01 is linked statically, so the executable does not
+depend on any file left in the build folder.
 
 Set the workspace to be the folder where you want the results to be generated.
 There must be a folder called "binaries" or "bins" containing the binaries in the workspace.
@@ -24,7 +20,7 @@ There must be a folder called "binaries" or "bins" containing the binaries in th
 The structure of the folders is as follows:
 
 ```
-main_worskpace/
+main_workspace/
     ├── binaries/
     │   ├── binary1
     │   └── binary2
@@ -37,4 +33,7 @@ main_worskpace/
         └── filexx..
 ```
 Each "set_xx" folder is generated automatically based on the number of binary files to test (one set corresponds to 20 files).
+For each set, the 96 Crush tests run in parallel, then Alphabit. Then Rabbit runs on each file separately: one
+single-threaded process per file, at most one per core at a time (`TESTU01_CORES` overrides the number), and the
+program ends only when all of them have finished.
 The "rabbit_results" is generated automatically and will contain one .txt file for each binary file tested.

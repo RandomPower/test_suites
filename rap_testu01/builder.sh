@@ -1,17 +1,9 @@
-mkdir testu01lib
-CUR_DIR=$(pwd)
+#!/bin/bash
+# Builds the rap_testu01 executable in ./build/src/rap_testu01.
+# TestU01 itself is downloaded and built by CMake (see CMakeLists.txt):
+# requires git, make, cmake >= 3.22 and access to github.com.
+set -euo pipefail
+cd "$(dirname "$0")"
 
-cd TestU01-2009
-
-chmod +x ./configure
-./configure --prefix="$CUR_DIR"/testu01lib
-make clean
-make
-make install
-
-cd ..
-
-mkdir build
-cd build
-cmake ..
-make
+cmake -S . -B build
+cmake --build build -j"$(nproc)"
