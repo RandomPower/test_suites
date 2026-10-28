@@ -67,6 +67,26 @@ X11 forwarding enabled (e.g. in MobaXterm). Progress is logged in `output_logs/`
 runs the tests in the foreground instead, `raptests -h` shows the help. Starting `raptests` again in a folder
 where the tests are still running is refused.
 
+To identify the run, e.g. with the board ID, give it a label:
+
+```
+raptests -l 2546_012
+```
+
+The label is put at the start of the report name (`2546_012_<folder>_<date>_report.xlsx`) and in its Info sheet.
+
+### Info sheet
+The last sheet of the report, "Info", records where and how the report was made, so that it can be identified
+also after it is copied or renamed:
+- the label, the full path of the workspace, the server and the user;
+- when the tests started and finished, and their duration;
+- the versions of test_suites, IID_validation, NIST STS and TestU01 (from `test_lib/VERSION`, written by
+  `install.sh`);
+- the main parameters: NIST stream length and number of streams, IID backend, symbols and permutations,
+  number of TestU01 sets;
+- the tested files, with their size, SHA-256 and IID seed (with the seed, the Rust backend of IID_validation
+  repeats exactly the same permutations).
+
 The structure of the folders, at the end of the tests, will be as follows:
 
 ```

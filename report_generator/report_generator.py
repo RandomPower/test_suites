@@ -4,9 +4,13 @@ Checks if random bit streams are compliant by analyzing test results.
 Generates an Excel report with categorized results.
 """
 
+import getpass
+import json
 import os
 import re
 import math
+import socket
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
@@ -26,6 +30,11 @@ NIST_PATH = 'nist_results/'
 NIST_SUBDIR = '/AlgorithmTesting/finalAnalysisReport.txt'
 RABBIT_PATH = 'rabbit_results/'
 IID_PATH = 'iid_results/'
+RUN_INFO_PATH = 'output_logs/run_info.txt'
+RUNTESTS_LOG_PATH = 'output_logs/runtests.log'
+BINARIES_DIRS = ('binaries', 'bins')
+# Folder of the installed test suite, with the VERSION file written by install.sh
+DEFAULT_TEST_LIB = '/usr/local/bin/test_lib'
 
 # Test result markers
 FAILED_NIST_MARKER = '*'
@@ -550,6 +559,162 @@ def write_iid_sheet(worksheet: xlsxwriter.worksheet.Worksheet,
             worksheet.write(row, 1, "No IID test performed")
 
 
+
+# ============================================================================
+# RUN INFORMATION (Info sheet)
+# ============================================================================
+
+def read_key_values(path: str) -> Dict[str, str]:
+    """Read a file of key=value lines (missing file: empty dictionary)."""
+    values = {}
+    try:
+        with open(path, 'r') as f:
+            for line in f:
+                if '=' in line:
+                    key, value = line.rstrip('\n').split('=', 1)
+                    values[key.strip()] = value.strip()
+    except OSError:
+        pass
+    return values
+
+
+def test_lib_dir() -> str:
+    """Folder of the installed test suite: the folder of this executable when it is the installed binary."""
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.environ.get('TEST_LIB_DIR', DEFAULT_TEST_LIB)
+
+
+def read_run_times() -> Tuple[Optional[str], Optional[str]]:
+    """Start and end of the tests, from the last run recorded in output_logs/runtests.log."""
+    start, end = None, None
+    try:
+        with open(RUNTESTS_LOG_PATH, 'r') as f:
+            for line in f:
+                if line.endswith('- Starting runtests.sh\n'):
+                    start, end = line.split(' - ')[0], None
+                elif line.endswith('- Tests finished\n'):
+                    end = line.split(' - ')[0]
+    except OSError:
+        pass
+    return start, end
+
+
+def find_bin_files() -> List[str]:
+    """Paths of the tested .bin files, in natural order."""
+    for folder in BINARIES_DIRS:
+        if os.path.isdir(folder):
+            return natsort.natsorted(os.path.join(folder, f) for f in os.listdir(folder) if f.endswith('.bin'))
+    return []
+
+
+def read_iid_configurations() -> Dict[str, dict]:
+    """IID configuration (configuration.json) of the last IID run of each file, by bin name."""
+    configs = {}
+    if not os.path.isdir(IID_PATH):
+        return configs
+    # The folders are named <bin name>@<date>_<time>: in sorted order the last run of a file comes last
+    for iid_dir in sorted(os.listdir(IID_PATH)):
+        try:
+            with open(os.path.join(IID_PATH, iid_dir, 'configuration.json'), 'r') as f:
+                configs[iid_dir.split('@')[0]] = json.load(f)
+        except (OSError, ValueError):
+            continue
+    return configs
+
+
+def read_nist_parameters() -> Tuple[Optional[int], Optional[int]]:
+    """Stream length and number of streams of the NIST tests, from the freq.txt file of the first file."""
+    if not os.path.isdir(NIST_PATH):
+        return None, None
+    for nist_dir in natsort.natsorted(os.listdir(NIST_PATH)):
+        try:
+            with open(os.path.join(NIST_PATH, nist_dir, 'AlgorithmTesting', 'freq.txt'), 'r') as f:
+                lengths = [int(m.group(1)) for m in re.finditer(r'BITSREAD = (\d+)', f.read())]
+        except OSError:
+            continue
+        if lengths:
+            return lengths[0], len(lengths)
+    return None, None
+
+
+def collect_run_info(label: str, report_name: str, n_sets: int) -> Dict[str, object]:
+    """Collect everything shown in the Info sheet."""
+    try:
+        user = getpass.getuser()
+    except Exception:
+        user = ''
+    start, end = read_run_times()
+    duration = ''
+    if start and end:
+        seconds = int((datetime.strptime(end, '%Y-%m-%d %H:%M:%S')
+                       - datetime.strptime(start, '%Y-%m-%d %H:%M:%S')).total_seconds())
+        duration = f'{seconds // 3600}h {seconds % 3600 // 60:02d}m {seconds % 60:02d}s'
+    nist_length, nist_streams = read_nist_parameters()
+    iid_configs = read_iid_configurations()
+    iid_any = next(iter(iid_configs.values()), {})
+    return {
+        'run': [
+            ('Label', label),
+            ('Report', f'{report_name}.xlsx'),
+            ('Workspace', os.getcwd()),
+            ('Server', socket.gethostname()),
+            ('User', user),
+            ('Tests started', start or ''),
+            ('Tests finished', end or ''),
+            ('Duration', duration),
+            ('Report created', datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
+        ],
+        'versions': list(read_key_values(os.path.join(test_lib_dir(), 'VERSION')).items()),
+        'parameters': [
+            ('NIST stream length (bits)', nist_length if nist_length is not None else ''),
+            ('NIST streams per file', nist_streams if nist_streams is not None else ''),
+            ('IID backend', iid_any.get('backend', '')),
+            ('IID symbols', iid_any.get('nist', {}).get('n_symbols', '')),
+            ('IID permutations', iid_any.get('nist', {}).get('n_permutations', '')),
+            ('TestU01 sets (Crush and Alphabit)', n_sets),
+        ],
+        'files': [
+            (os.path.basename(path), os.path.getsize(path),
+             iid_configs.get(Path(path).stem, {}).get('input_file_digest', ''),
+             iid_configs.get(Path(path).stem, {}).get('seed', ''))
+            for path in find_bin_files()
+        ],
+    }
+
+
+def write_info_sheet(worksheet: xlsxwriter.worksheet.Worksheet,
+                     info: Dict[str, object],
+                     formats: Dict[str, xlsxwriter.format.Format]) -> None:
+    """Write the Info worksheet: label, workspace, times, versions, parameters and tested files."""
+    worksheet.set_column(0, 0, 34)
+    worksheet.set_column(1, 1, 60)
+    worksheet.set_column(2, 3, 25)
+    row = 0
+    for title, items in (('RUN', info['run']), ('VERSIONS', info['versions']), ('PARAMETERS', info['parameters'])):
+        worksheet.merge_range(row, 0, row, 1, title, formats['merge'])
+        row += 1
+        if not items:
+            worksheet.write(row, 0, 'not available')
+            row += 1
+        for key, value in items:
+            worksheet.write(row, 0, key, formats['title'])
+            worksheet.write(row, 1, value)
+            row += 1
+        row += 1
+
+    worksheet.merge_range(row, 0, row, 3, 'TESTED FILES', formats['merge'])
+    row += 1
+    for col, header in enumerate(('File', 'Size (bytes)', 'SHA-256', 'IID seed')):
+        worksheet.write(row, col, header, formats['title'])
+    for name, size, digest, seed in info['files']:
+        row += 1
+        worksheet.write(row, 0, name)
+        worksheet.write(row, 1, size)
+        worksheet.write(row, 2, digest)
+        # Seeds are 64-bit integers: written as text, Excel would round them
+        worksheet.write_string(row, 3, str(seed))
+
 # ============================================================================
 # MAIN EXECUTION
 # ============================================================================
@@ -563,7 +728,10 @@ def generate_report() -> None:
         current_dir = ""
     
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_name = f'{current_dir}{timestamp}_report'
+    # Optional label given with raptests -l (e.g. the board ID), at the start of the name
+    label = read_key_values(RUN_INFO_PATH).get('label', '')
+    label_prefix = re.sub(r'[^A-Za-z0-9._-]+', '_', label) + '_' if label else ''
+    report_name = f'{label_prefix}{current_dir}{timestamp}_report'
     
     # Parse all test results
     nist_results = parse_nist_results()
@@ -598,6 +766,9 @@ def generate_report() -> None:
     
     wrks3 = workbook.add_worksheet('IID Details')
     write_iid_sheet(wrks3, bins, formats)
+
+    wrks_info = workbook.add_worksheet('Info')
+    write_info_sheet(wrks_info, collect_run_info(label, report_name, len(set_dirs)), formats)
     
     workbook.close()
     print(f"Report generated: {report_name}.xlsx")

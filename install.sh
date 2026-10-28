@@ -40,6 +40,14 @@ cp report_generator/dist/report_generator test_lib/
 # Copy the TestU01 runner in the new folder
 cp rap_testu01/build/src/rap_testu01 test_lib/testu01
 
+# Versions of the installed software, shown in the Info sheet of the reports
+{
+    echo "test_suites=$(git describe --tags --match "v[0-9]*" --always --dirty)"
+    echo "IID_validation=$(git -C external/IID_validation describe --tags --match "v[0-9]*" --always --dirty)"
+    echo "NIST_STS=2.1.2 with RaP changes (tag nist-sts-2.1.2)"
+    echo "TestU01=1.2.3 (umontreal-simul/TestU01-2009 @ $(sed -n 's/.*GIT_TAG *\([0-9a-f]\{7\}\).*/\1/p' rap_testu01/CMakeLists.txt))"
+} > test_lib/VERSION
+
 # Give run permissions to the scripts
 chmod +x test_lib/runtests.sh test_lib/run_iid.sh test_lib/raptests
 
