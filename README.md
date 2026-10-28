@@ -78,7 +78,7 @@ without a label) and in its Info sheet. The name has no date, which is in the In
 again in the same folder replaces it.
 
 ### Info sheet
-The last sheet of the report, "Info", records where and how the report was made, so that it can be identified
+The first sheet of the report, "Info", records where and how the report was made, so that it can be identified
 also after it is copied or renamed:
 - the label, the full path of the workspace, the server and the user;
 - when the tests started and finished, and their duration;

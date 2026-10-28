@@ -757,7 +757,10 @@ def generate_report() -> None:
     workbook = xlsxwriter.Workbook(f'{report_name}.xlsx')
     formats = create_excel_formats(workbook)
     
-    # Generate worksheets
+    # Generate worksheets. Info is the first one, so it is the sheet shown when the report is opened
+    wrks_info = workbook.add_worksheet('Info')
+    write_info_sheet(wrks_info, collect_run_info(label, report_name, len(set_dirs)), formats)
+
     wrks1 = workbook.add_worksheet('NIST & Rabbit')
     write_nist_rabbit_sheet(wrks1, bins, formats)
     
@@ -767,9 +770,6 @@ def generate_report() -> None:
     
     wrks3 = workbook.add_worksheet('IID Details')
     write_iid_sheet(wrks3, bins, formats)
-
-    wrks_info = workbook.add_worksheet('Info')
-    write_info_sheet(wrks_info, collect_run_info(label, report_name, len(set_dirs)), formats)
     
     workbook.close()
     print(f"Report generated: {report_name}.xlsx")
