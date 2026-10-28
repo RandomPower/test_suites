@@ -727,11 +727,12 @@ def generate_report() -> None:
     except:
         current_dir = ""
     
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    # Optional label given with raptests -l (e.g. the board ID), at the start of the name
+    # Optional label given with raptests -l (e.g. the board ID), at the start of the name.
+    # No date in the name: the folder name often is a date already, and the Info sheet has the
+    # date of the report. Creating the report again in the same folder replaces it.
     label = read_key_values(RUN_INFO_PATH).get('label', '')
     label_prefix = re.sub(r'[^A-Za-z0-9._-]+', '_', label) + '_' if label else ''
-    report_name = f'{label_prefix}{current_dir}{timestamp}_report'
+    report_name = f'{label_prefix}{current_dir}report'
     
     # Parse all test results
     nist_results = parse_nist_results()

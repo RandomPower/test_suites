@@ -73,7 +73,9 @@ To identify the run, e.g. with the board ID, give it a label:
 raptests -l 2546_012
 ```
 
-The label is put at the start of the report name (`2546_012_<folder>_<date>_report.xlsx`) and in its Info sheet.
+The label is put at the start of the report name (`2546_012_<folder>_report.xlsx`, or `<folder>_report.xlsx`
+without a label) and in its Info sheet. The name has no date, which is in the Info sheet: creating the report
+again in the same folder replaces it.
 
 ### Info sheet
 The last sheet of the report, "Info", records where and how the report was made, so that it can be identified
