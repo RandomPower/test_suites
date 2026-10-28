@@ -14,3 +14,4 @@ report_generator/report_generator.spec
 test_lib/nist/
 test_lib/testu01
 test_lib/report_generator
+test_lib/VERSION
