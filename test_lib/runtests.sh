@@ -37,6 +37,8 @@ for pid in "${pids[@]}"; do
 done
 set -e
 
+# End of the tests, shown in the Info sheet of the report
+echo "$(timestamp) - Tests finished" >> "$OUTPUT_DIR"/runtests.log
 /usr/local/bin/test_lib/report_generator >> "$OUTPUT_DIR"/runtests.log 2>&1
 rm -f ._*.bin
 

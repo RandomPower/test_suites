@@ -3,27 +3,36 @@
 # on the .bin files in ./binaries (or ./bins) and creates the Excel report.
 #
 # Run it from the folder that contains binaries/. By default the tests start in
-# the background (they take hours) and keep running after you log out; logs are
-# written to output_logs/ and the report to this folder at the end.
+# the background and keep running after you log out; logs are written to
+# output_logs/ and the report to this folder at the end.
 #
-# Usage: raptests       start the tests in the background
-#        raptests -f    run in the foreground and wait until the end
-#        raptests -h    show this help
+# Usage: raptests [-l LABEL] [-f]
+#        -l LABEL   free text identifying the run (e.g. the board ID): shown in the
+#                   Info sheet of the report and put at the start of its name
+#        -f         run in the foreground and wait until the end
+#        -h         show this help
 set -euo pipefail
 
 TEST_LIB=$(dirname "$(readlink -f "$0")")
 LOG_DIR="$PWD/output_logs"
 PID_FILE="$LOG_DIR/raptests.pid"
 
-usage() { sed -n '2,11p' "$0" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; }
 
 FOREGROUND=0
-case "${1:-}" in
-    "") ;;
-    -f|--foreground) FOREGROUND=1 ;;
-    -h|--help) usage; exit 0 ;;
-    *) echo "raptests: unknown option '$1'" >&2; usage >&2; exit 2 ;;
-esac
+LABEL=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -f|--foreground) FOREGROUND=1 ;;
+        -l|--label)
+            if [ $# -lt 2 ]; then echo "raptests: $1 needs a value" >&2; exit 2; fi
+            LABEL=$2
+            shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) echo "raptests: unknown option '$1'" >&2; usage >&2; exit 2 ;;
+    esac
+    shift
+done
 
 # Check the input folder
 if [ -d binaries ]; then
@@ -48,7 +57,10 @@ if [ -f "$PID_FILE" ] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
 fi
 
 mkdir -p "$LOG_DIR"
-echo "raptests: ${#FILES[@]} files in $BIN_DIR/"
+echo "raptests: ${#FILES[@]} files in $BIN_DIR/${LABEL:+, label: $LABEL}"
+# Saved for the report generator (also when it is run again by hand); rewritten at every run,
+# so that a label never carries over to a later run without one
+printf 'label=%s\n' "${LABEL//$'\n'/ }" > "$LOG_DIR/run_info.txt"
 
 if [ "$FOREGROUND" -eq 1 ]; then
     echo $$ > "$PID_FILE"
