@@ -9,10 +9,12 @@ create_dir_script() {
 }
 
 shopt -s nullglob
+# Relative paths: assess cuts the input file name at 200 characters, so absolute paths
+# of deep folders failed ("File Error ... could not be opened"). assess runs in $CUR_DIR.
 if [ -d binaries ]; then
-    FILES=( "$CUR_DIR"/binaries/*.bin )
+    FILES=( binaries/*.bin )
 elif [ -d bins ]; then
-    FILES=( "$CUR_DIR"/bins/*.bin )
+    FILES=( bins/*.bin )
 else
     echo "No binaries directory found."
     exit 1
