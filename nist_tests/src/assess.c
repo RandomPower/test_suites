@@ -76,9 +76,12 @@ main(int argc, char *argv[])
 	}
 	if(argc==8)
 	{ /* If the user has specified the option -c */
-    	streamFile = (char*)calloc(200, sizeof(char));
-	//strncpy(file,argv[3],sizeof(argv[3]));
-	sprintf(streamFile, "%s", argv[3]);
+	/* Copy of the whole path: the original 200-byte buffer overflowed with longer paths */
+	streamFile = strdup(argv[3]);
+	if (streamFile == NULL) {
+		printf("Out of memory\n");
+		exit(-1);
+	}
 	printf("File: %s\n",streamFile);
   if ( (fp = fopen(streamFile, "r")) == NULL )
 	{
